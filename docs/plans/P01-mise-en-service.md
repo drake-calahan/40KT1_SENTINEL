@@ -3,8 +3,9 @@
 > **Statut** : phase `P0` en cours. Rien n'est installé.
 > **ADR** : [`ADR-001`](../adr/ADR-001-moteur-et-profil-de-deploiement.md) ·
 > [`ADR-002`](../adr/ADR-002-catalogue-et-budget-de-reponse.md) ·
-> [`ADR-003`](../adr/ADR-003-hote-du-serveur-central.md) — **toutes au statut
-> Proposé.**
+> [`ADR-003`](../adr/ADR-003-hote-du-serveur-central.md) — **`002` et `003`
+> *Acceptées* le 2026-09-07 ; `001` encore *Proposé*.**
+> **Découpage et affectation** : [`P02`](P02-lancement-implementation.md)
 > **Suivi** : [`.agent/TASKS.md`](../../.agent/TASKS.md)
 
 ## 1. Ce que ce plan livre
@@ -36,9 +37,10 @@ qui ne l'est pas.
 
 ### P0 — Cadrage *(en cours — réponses consignées 2026-09-07)*
 
-Réponses au questionnaire **consignées** dans `ACTIVE.md`. Suite : ADR passées
-de *Proposé* à *Accepté* (`P00.2`–`P00.4`), contrat de frontière avec HQ relu
-**des deux côtés**, dépôt créé et poussé.
+Réponses au questionnaire **consignées** dans `ACTIVE.md`. `ADR-002` et
+`ADR-003` sont passées *Acceptées* le 2026-09-07 ; restent `ADR-001` (`P00.2`),
+le **jumeau** du contrat de frontière côté HQ (`P00.5`) et la mise en place du
+dépôt (`P00.6`).
 
 **Aucune machine touchée.**
 

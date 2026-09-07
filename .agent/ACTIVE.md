@@ -1,10 +1,11 @@
 # ACTIVE.md — Index actif (lecture obligatoire)
 
 > **État au 2026-09-07 : dépôt amorcé, cadrage répondu (30/30), rien n'est installé
-> ni armé.** Aucune machine du parc ne porte quoi que ce soit de ce dépôt. Les
-> trois ADR restent au statut **Proposé** — la suite P0 = les formaliser *Accepté*
-> (`P00.2`–`P00.4`), pas re-décider. Le plan `P01` est écrit ; **P1 reste bloquée**
-> tant que `ADR-003` n'est pas *Accepté*.
+> ni armé.** Aucune machine du parc ne porte quoi que ce soit de ce dépôt.
+> **`ADR-002` et `ADR-003` sont *Acceptées*** (2026-09-07) : `P1` et l'écriture de
+> l'exécuteur sont débloquées. `ADR-001` reste *Proposé* (`P00.2`). Le contrat de
+> frontière est en vigueur **côté Sentinelle seulement** — son jumeau reste à
+> porter dans HQ (`P00.5`), et sans lui il n'engage personne.
 
 ## Phase courante
 
@@ -13,21 +14,27 @@
 8 blocs) a reçu les réponses du PO le **2026-09-07**. Les quatre STRUCTURANTES
 sont tranchées et consignées ci-dessous § « Réponses au cadrage ».
 
-**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus) : `P00.2` → `P00.3` →
-`P00.4` → `P00.5` → `P00.6`. Écrire les rôles Ansible **seulement après**
-`ADR-003` *Accepté*.
+**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus) : `P00.6` — tant que
+l'amorce n'est pas sur `main`, aucune branche n'a de base, et rien ne fusionne.
+Ensuite : `P00.7`, `P00.8`, `P00.2`, `P01.7` (`cursor`) · `P01.6` puis `P01.0`
+(`claude`) · **porter le jumeau du contrat dans HQ** (`P00.5`, dernière moitié).
+
+**Le lancement est cadré** : découpage en lots, affectation et ordre des vagues
+dans [`docs/plans/P02`](../docs/plans/P02-lancement-implementation.md) ; briefs
+des lots `cursor` dans [`briefs/`](briefs/). Un lot `cursor` ne part pas sans son
+brief au statut `prêt`.
 
 ### Quatre décisions structurantes — tranchées au cadrage
 
-Les arbitrages sont rendus ; il reste à les **formaliser** dans les ADR et le
-contrat HQ (statut *Accepté*, pas *Proposé*).
+Les arbitrages sont rendus **et formalisés**, sauf la moitié HQ du contrat de
+frontière — un texte écrit d'un seul côté n'est pas une frontière.
 
 | # | Décision | Résumé (cadrage 2026-09-07) | Formalisation |
 |---|----------|-----------------------------|---------------|
-| **C1** | Où vit le serveur central | **`patator-standby`**, profil frugal (zéro budget). Plan B : **`bluefin` temporaire jour** (MVP) ; secours **24/7** seulement en **pire cas**. | [`ADR-003`](../docs/adr/ADR-003-hote-du-serveur-central.md) — `P00.3` |
-| **E2** | Quels gestes entrent au catalogue armé | **Quatre premiers** armés (bloquer IP, tuer processus, arrêter conteneur, quarantaine fichier) ; cinq autres alerte seulement. | [`ADR-002`](../docs/adr/ADR-002-catalogue-et-budget-de-reponse.md) — `P00.4` |
-| **E4** | Réponse en mode tournoi | **Moins agressive** : gestes invisibles seulement ; le reste alerte rouge + action proposée à un clic. | [`ADR-002`](../docs/adr/ADR-002-catalogue-et-budget-de-reponse.md) — `P00.4` |
-| **H3** | Frontière de propriété avec HQ | HQ possède la **base** ; Sentinelle **ajoute** (règles taguées, unités `sentinel-*`), ne réécrit jamais une politique HQ. Contrat **dans les deux dépôts**. | [`docs/contrat-hq.md`](../docs/contrat-hq.md) — `P00.5` |
+| **C1** | Où vit le serveur central | **`patator-standby`**, profil frugal (zéro budget). Plan B : **`bluefin` temporaire jour** (MVP) ; secours **24/7** seulement en **pire cas**. | [`ADR-003`](../docs/adr/ADR-003-hote-du-serveur-central.md) **Acceptée** — revue le 2027-03-07 |
+| **E2** | Quels gestes entrent au catalogue armé | **Quatre premiers** armés (bloquer IP, tuer processus, arrêter conteneur, quarantaine fichier) ; cinq autres alerte seulement. | [`ADR-002`](../docs/adr/ADR-002-catalogue-et-budget-de-reponse.md) **Acceptée** |
+| **E4** | Réponse en mode tournoi | **Moins agressive** : gestes invisibles seulement ; le reste alerte rouge + action proposée à un clic. | [`ADR-002`](../docs/adr/ADR-002-catalogue-et-budget-de-reponse.md) **Acceptée** |
+| **H3** | Frontière de propriété avec HQ | HQ possède la **base** ; Sentinelle **ajoute** (règles taguées, unités `sentinel-*`), ne réécrit jamais une politique HQ. Contrat **dans les deux dépôts**. | [`docs/contrat-hq.md`](../docs/contrat-hq.md) en vigueur ici ; **jumeau à porter** (`P00.5`) |
 
 ### Ce qui est armé
 
@@ -42,9 +49,15 @@ documenté par un runbook.
 | Agent sur `patator-standby` | absent | `P1` |
 | Serveur central | absent | `P1` — hôte **tranché** : `patator-standby` frugal |
 | Alerte Discord + push | non câblée | `P2` |
-| Réponse à blanc | non | `P3` |
+| Réponse à blanc | non — noyau livré, aucun geste câblé | `P3` |
 | Réponse armée | non | `P3` |
 | Agent sur `AEGIS-TOWER` | absent | `P4` |
+
+Armer la réponse n'est pas une case à cocher : `ADR-002` § 6 pose **cinq portes**
+— sortie chiffrée de la phase 1, alerte prouvée sur les deux canaux, quatorze
+jours de mode à blanc sans geste injustifié, désarmement joué depuis un
+téléphone, puis **un geste à la fois** à sept jours d'intervalle. Le geste
+appartient au PO (`P03.4`).
 
 ## Ce qu'il faut savoir avant de toucher au dépôt
 
@@ -83,14 +96,15 @@ qui se posent le même verrou est un mode de panne connu.
 | Plan | Sujet | État |
 |------|--------|------|
 | [`P01`](../docs/plans/P01-mise-en-service.md) | Mise en service, phases P0 → P4 | **P0** — cadrage consigné ; suite = ADR *Accepté* |
+| [`P02`](../docs/plans/P02-lancement-implementation.md) | Lancement : découpage des lots, affectation, vagues | **actif** — vague 0 bloquée par `P00.6` |
 
 ## ADR
 
 | # | Décision | Statut |
 |---|----------|--------|
 | [001](../docs/adr/ADR-001-moteur-et-profil-de-deploiement.md) | Moteur de détection et profil de déploiement | **Proposé** — à accepter (`P00.2`) |
-| [002](../docs/adr/ADR-002-catalogue-et-budget-de-reponse.md) | Catalogue de réponse, budget, mode tournoi | **Proposé** — à accepter (`P00.4`) |
-| [003](../docs/adr/ADR-003-hote-du-serveur-central.md) | Hôte du serveur central | **Proposé** — à accepter (`P00.3`, bloque `P1`) |
+| [002](../docs/adr/ADR-002-catalogue-et-budget-de-reponse.md) | Catalogue de réponse, budget, mode tournoi | **Accepté** 2026-09-07 — débloque `P3` ; porte les **conditions d'armement** |
+| [003](../docs/adr/ADR-003-hote-du-serveur-central.md) | Hôte du serveur central | **Accepté** 2026-09-07 — débloque `P1` ; **revue le 2027-03-07** |
 
 Index : [`docs/adr/README.md`](../docs/adr/README.md).
 

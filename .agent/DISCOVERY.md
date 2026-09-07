@@ -107,6 +107,42 @@ sans que personne le sache.
 **Implication** : à la mise en service, **prouver** l'écriture des archives, ne
 pas la supposer.
 
+## Pièges rencontrés dans ce dépôt
+
+### `Path.exists()` confond « absent » et « je n'ai pas pu regarder »
+
+*2026-09-07, exécuteur de réponse (`P03.0`).* `Path.exists()` avale l'`OSError` et
+rend `False` — donc un témoin de désarmement dans un répertoire illisible se lit
+comme « pas de désarmement », et un témoin de mode tournoi inaccessible se lit
+comme « pas de tournoi ». Les deux erreurs vont dans le sens permissif.
+
+**Implication** : dans `responder/gardes.py`, la présence d'un témoin se lit par
+`os.stat` avec trois issues — présent / absent / **indéterminé** — et
+l'indéterminé vaut l'état le plus restrictif. C'est le même faux vert que celui
+des playbooks à zéro hôte, sous un autre déguisement.
+
+### Un compteur en mémoire n'est pas un budget
+
+*2026-09-07.* Le budget de trois gestes par heure se lit dans le journal, pas
+dans une variable : un redémarrage du service remettrait un compteur en mémoire à
+zéro, et le budget servirait exactement quand il ne faut pas — après un incident
+qui a fait redémarrer la machine.
+
+**Implication** : le journal est la source du compte, et une ligne corrompue rend
+le compte `None` (non mesurable) plutôt qu'un total partiel. Un total partiel
+desserre la garde sans le dire.
+
+### Le dégel doit être tracé, pas seulement possible
+
+*2026-09-07.* Première version : le gel se levait en retirant le fichier témoin.
+Défaut — le geste ne laissait aucune trace, et le compte de l'heure glissante
+restait de toute façon au-dessus du plafond : le PO aurait retiré le fichier et
+constaté que « ça ne marche pas ».
+
+**Implication** : `python -m responder.degel "motif"` retire le témoin **et**
+écrit une entrée `degel` dans le journal ; c'est cette entrée qui remet le
+compteur à zéro. Le motif est obligatoire.
+
 ## Contraintes de ressources
 
 - Serveur central en profil frugal : **0,7 à 1,2 Go** de RAM. Le profil complet
