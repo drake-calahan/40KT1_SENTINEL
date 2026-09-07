@@ -23,8 +23,8 @@ toujours citée avec son dépôt d'origine (« `ADR-062` de HQ ») — sans quoi
 | # | Décision | Statut | Bloque |
 |---|----------|--------|--------|
 | [001](ADR-001-moteur-et-profil-de-deploiement.md) | Moteur de détection et profil de déploiement | **Proposé** | `P1` |
-| [002](ADR-002-catalogue-et-budget-de-reponse.md) | Catalogue de réponse, budget, mode tournoi | **Proposé** | `P3` |
-| [003](ADR-003-hote-du-serveur-central.md) | Hôte du serveur central | **Proposé** | `P1` |
+| [002](ADR-002-catalogue-et-budget-de-reponse.md) | Catalogue de réponse, budget, mode tournoi | **Accepté** (2026-09-07) | — débloque `P3` |
+| [003](ADR-003-hote-du-serveur-central.md) | Hôte du serveur central | **Accepté** (2026-09-07) | — débloque `P1` |
 
 ## ADR de `40KT1_HQ` dont ce dépôt dépend
 
