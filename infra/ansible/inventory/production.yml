@@ -1,0 +1,79 @@
+---
+# Inventaire de production — Sentinelle.
+#
+# ⚠️ CES MACHINES SERVENT LA PRODUCTION.
+# `patator-tower` sert `hq.40kt1.com`. `patator-standby` porte le miroir et la
+# relève en lecture seule. Un playbook joué ici n'est pas un playbook de
+# laboratoire : `--check --diff` d'abord, ordre PO ensuite, apply en dernier.
+#
+# Les comptes ci-dessous sont ceux qui EXISTENT sur les machines (`calahan` sur
+# les deux nœuds Linux), repris de l'inventaire de `40KT1_HQ`. Ce ne sont pas
+# des comptes de service à créer.
+#
+# --- CE QUI MANQUE ENCORE, ET POURQUOI ---------------------------------------
+#
+# Le groupe `sentinel_server` est VIDE, et il le reste tant qu'`ADR-003` n'est
+# pas acceptée. Le remplir maintenant reviendrait à choisir l'hôte du serveur
+# central par un commit plutôt que par une décision — et cet hôte ne se change
+# pas après coup sans tout ré-enrôler.
+#
+# Les trois candidats sont décrits dans `docs/adr/ADR-003-hote-du-serveur-central.md` :
+#   (a) patator-standby, profil frugal, sous conditions de bornage
+#   (b) un matériel dédié (mini-PC), non acquis à ce jour
+#   (c) patator-tower — écarté : le serveur surveillerait son propre hôte
+#
+# Un groupe vide est délibéré et visible. Un groupe rempli au hasard produit un
+# play qui rend `ok` en ne touchant rien, et c'est le pire des modes de panne.
+
+all:
+  children:
+
+    # --- Les endpoints qui portent un agent --------------------------------
+    sentinel_agents:
+      children:
+        sentinel_agents_linux:
+          hosts:
+
+            patator-tower:
+              ansible_host: patator-tower.tail29e268.ts.net
+              ansible_user: calahan
+              ansible_connection: ssh
+              ansible_python_interpreter: /usr/bin/python3
+
+              # `sudo` CLASSIQUE, explicitement. Ubuntu 26.04 fait de sudo-rs le
+              # `sudo` par défaut, et sa gestion du mot de passe hors TTY n'est
+              # pas celle qu'Ansible attend : le playbook s'arrête sur
+              # « Timeout (32s) waiting for privilege escalation prompt ».
+              # Mesuré dans 40KT1_HQ le 2026-08-26 ; sans ce réglage, rien ne
+              # passe sur ce nœud.
+              ansible_become_exe: /usr/bin/sudo.ws
+
+              sentinel_node_role: primary
+              # Racine de la stack de production, SURVEILLÉE en lecture.
+              # Sentinelle n'y écrit pas (voir docs/contrat-hq.md).
+              hq_stack_dir: /srv/40kt1
+
+            patator-standby:
+              ansible_host: patator-standby.tail29e268.ts.net
+              ansible_user: calahan
+              ansible_connection: ssh
+              ansible_python_interpreter: /usr/bin/python3
+
+              sentinel_node_role: secondary
+              # `~/40KT1_HQ` et non `/opt` : c'est le chemin que documentent les
+              # runbooks de HQ, donc celui où vivent réellement le `.env`, le
+              # compose et les scripts.
+              hq_stack_dir: /home/calahan/40KT1_HQ
+
+              # ⚠️ Défaut réseau récidivant : quatre pertes totales d'IPv4 en
+              # trois semaines (28/08, 30/08, 05/09, 06/09), cause
+              # NetworkManager. Un `--check` qui échoue ici n'est pas forcément
+              # un défaut du playbook. Voir `.agent/DISCOVERY.md`.
+              sentinel_flaky_network: true
+
+        # Postes d'administration — phase 4, ALERTE SEULEMENT (question E6).
+        # Vide aujourd'hui : `AEGIS-TOWER` n'entre au périmètre qu'en P04.0.
+        sentinel_agents_workstations:
+
+    # --- Le serveur central — hôte à trancher (C1 / ADR-003) ----------------
+    sentinel_server:

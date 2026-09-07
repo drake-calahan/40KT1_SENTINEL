@@ -1,0 +1,9 @@
+# Faux positifs gitleaks — une ligne par empreinte, AVEC son motif.
+#
+# Format : <commit-sha>:<chemin>:<règle>:<ligne>
+#
+# Règle de tenue : une entrée sans justification écrite est une entrée à
+# supprimer. Ce fichier est la porte de sortie du gate secrets — il se relit
+# en revue, comme du code.
+#
+# (aucune exception à ce jour)

@@ -1,0 +1,36 @@
+---
+description: Ansible et infrastructure — cibles de production, --check obligatoire
+globs: infra/**,.github/**
+alwaysApply: false
+---
+
+# Ansible & infra
+
+## Zones sensibles (ordre PO requis, formulé dans la session courante)
+
+- Tout `apply` sur `patator-tower` ou `patator-standby`
+- `infra/ansible/inventory/**` — l'inventaire décide quelle machine est laquelle
+- Les runbooks `docs/runbooks/**`
+
+## Règles
+
+- **`--check --diff` d'abord, systématiquement.** Le hook shell refuse un
+  `ansible-playbook` sans `--check`.
+- **Idempotence** : un rôle doit pouvoir être rejoué sur une machine en
+  production **sans redémarrer un service**. Un changement qui l'exigerait est
+  *signalé* dans le bilan du rôle, pas joué.
+- **Aucun rôle n'arme quoi que ce soit** : les variables `*_enabled` valent
+  `false` par défaut, et l'armement est un geste d'exploitation séparé.
+- **Sentinelle ajoute, ne réécrit jamais** ce qui appartient à HQ : politique
+  `ufw`, Docker, Tailscale, mode tournoi. Règles pare-feu dans une chaîne dédiée
+  et taguées ; unités préfixées `sentinel-*`.
+- `ansible-lint` + `yamllint` verts avant toute PR.
+
+## Pièges déjà payés (voir `.agent/DISCOVERY.md`)
+
+- **`sudo-rs` sur Ubuntu 26.04** casse l'élévation Ansible sur `patator-tower` :
+  reprendre `ansible_become_exe: /usr/bin/sudo.ws`.
+- **Un play qui vise zéro hôte rend `ok` sans rien faire.** Vérifier le nombre
+  d'hôtes touchés, pas seulement le code de retour.
+- **`ufw` ne couvre pas les ports publiés par Docker** (chaîne `DOCKER-USER`,
+  en amont).

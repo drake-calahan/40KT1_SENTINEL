@@ -1,0 +1,37 @@
+---
+description: Cœur 40KT1_SENTINEL — harnais .agent, doctrine désarmé par défaut, langue FR
+alwaysApply: true
+---
+
+# Projet 40KT1_SENTINEL
+
+EDR / HIDS auto-hébergé du parc 40KT1 : un agent par endpoint, un serveur central
+qui corrèle, une réponse automatique **bornée** sur `patator-tower` et
+`patator-standby`. Stack : Ansible · Python · systemd · tailnet Tailscale.
+
+## Sources de vérité (ne pas dupliquer)
+
+1. `.agent/RULES.md` — règles non négociables
+2. `.agent/ACTIVE.md` — index actif : phase, décisions en attente, **ce qui est armé**
+3. `.agent/TASKS.md` — Focus / tâche ouverte
+4. `docs/adr/` — décisions d'architecture
+5. `docs/contrat-hq.md` — frontière avec le dépôt frère `40KT1_HQ`
+
+## Doctrine — prime sur la vitesse
+
+- **Tout est désarmé par défaut.** Aucun commit n'arme un timer, une alerte ou
+  une réponse. Armer est un geste d'exploitation.
+- **On prouve d'abord qu'une alerte arrive, on arme ensuite.**
+- **Une automatisation n'a le droit de faire que ce qu'un humain peut défaire
+  sans arbitrage.** Le critère est la réversibilité, pas la confiance.
+- **Un `ok` n'est pas un `inconnu`.** Une sonde qui n'a pas mesuré rend `unknown`.
+
+## Cibles réelles
+
+`patator-tower` sert `hq.40kt1.com`. `patator-standby` porte le miroir et la
+relève en lecture seule. Ce ne sont pas des machines de laboratoire.
+
+## Langue
+
+Documentation, commentaires et messages d'alerte en **français** — ils seront
+lus à 3 h du matin.

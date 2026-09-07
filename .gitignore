@@ -1,0 +1,49 @@
+# --- Secrets & état ---------------------------------------------------------
+# Les trois secrets du dispositif vivent ici : clé d'enrôlement des agents,
+# jeton d'API du serveur central, webhook Discord dédié. L'un d'eux permet
+# d'inscrire un faux agent — d'où la ligne, et d'où gitleaks en CI.
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+
+# Journaux et relevés de sécurité : ils décrivent l'infrastructure entière
+# (chemins, comptes, horaires, empreintes). Rien de tout cela n'entre au dépôt.
+security-state/
+*.alerts.json
+*.log
+
+# Vault Ansible déchiffré par erreur
+*.vault.decrypted
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Ansible ----------------------------------------------------------------
+*.retry
+infra/ansible/collections/
+infra/ansible/inventory/host_vars/*.local.yml
+
+# --- Outils agents ----------------------------------------------------------
+# Les réglages partagés se commitent ; ceux de la machine, non.
+.claude/settings.local.json
+
+# --- OS / éditeurs ----------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
