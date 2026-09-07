@@ -28,16 +28,22 @@ partie, toujours.**
 
 > **2026-09-07** — les 30 réponses sont consignées dans `ACTIVE.md` § « Réponses
 > au cadrage ». Les quatre STRUCTURANTES (`C1`, `E2`, `E4`, `H3`) sont tranchées.
-> Les ADR restent *Proposé* : la suite = les passer *Accepté*, pas re-décider.
+> Les faire passer en ADR *Accepté* ne re-décide rien : c'est la seule forme
+> qu'un rôle Ansible a le droit de lire.
 >
 > **Rien ne part avant `P00.6`** : les branches se basent sur `origin/main`, et
 > `main` ne porte qu'une racine vide tant que l'amorce n'est pas fusionnée.
 >
-> **Ensuite, en parallèle** : `P00.7` et `P00.8` (`cursor`) · `P00.2` (`cursor`)
-> · `P00.3` → `P00.4` → `P00.5` (`claude`) · `P01.7` (`cursor`).
+> **2026-09-07, dans la foulée** : `P00.3` et `P00.4` sont **faites** —
+> `ADR-002` et `ADR-003` sont *Acceptées*. `P00.5` est à moitié faite : le jumeau
+> du contrat reste à porter dans `40KT1_HQ`.
 >
-> **Toujours bloqué** : **aucun rôle Ansible** tant qu'`ADR-003` n'est pas
-> *Accepté* (`P00.3`).
+> **Ensuite, en parallèle** : `P00.7`, `P00.8`, `P00.2`, `P01.7` (`cursor`) ·
+> `P01.6` puis `P01.0` (`claude`).
+>
+> **Plus bloqué** : les rôles Ansible le sont — `ADR-003` est *Acceptée*. Ce qui
+> bloque encore, c'est `P00.6` : sans amorce sur `main`, aucune branche n'a de
+> base.
 
 - [x] **P00.0** Amorce du dépôt : harnais `.agent/`, couche Cursor, hub docs,
       trois ADR au statut *Proposé*, plan `P01`, contrat de frontière avec HQ,
@@ -60,20 +66,25 @@ partie, toujours.**
 - [ ] **P00.2** (cursor) `ADR-001` (moteur et profil) passe *Proposé* → *Accepté*,
       à partir des réponses `A2`, `A3`, `A4`, `C2`, `F4` consignées —
       [brief](briefs/P00.2-adr-001-accepte.md).
-- [ ] **P00.3** (claude) `ADR-003` (hôte du serveur central) tranché —
-      **bloquant `P1`**. L'hôte est `patator-standby` : l'ADR doit écrire **la
-      sortie**, comme l'exception `P31.7` l'a fait pour le cockpit dans HQ.
-- [ ] **P00.4** (claude) `ADR-002` (catalogue, budget, mode tournoi) tranché —
-      **bloquant `P3`**. Le tableau geste par geste du § 2.5 de la proposition
-      est le point de départ, pas la conclusion.
-- [ ] **P00.5** (claude) [`docs/contrat-hq.md`](../docs/contrat-hq.md) relu et
-      **son jumeau créé côté HQ**. Une frontière écrite d'un seul côté n'est pas
-      une frontière.
+- [x] **P00.3** (claude, 2026-09-07) `ADR-003` **Acceptée** : hôte
+      `patator-standby` en profil frugal, quatre conditions rendues vérifiables
+      avec leur contrôle et leur lot, sortie écrite à trois déclencheurs et
+      **revue datée au 2027-03-07**. Débloque `P1`.
+- [x] **P00.4** (claude, 2026-09-07) `ADR-002` **Acceptée** : catalogue fermé
+      geste par geste (4 armés / 4 alerte / 1 jamais), « invisible pour l'équipe »
+      défini, budget en **trois états** avec dégel humain, et les **cinq portes
+      de l'armement** (§ 6) qui cadrent `P03.4`. Débloque `P03.0`.
+- [~] **P00.5** (claude, 2026-09-07) Contrat de frontière : côté Sentinelle
+      **fait** (relève et chaîne de blocage ajoutées à la liste d'objets, trois
+      engagements de HQ explicités) ; le **jumeau reste à porter** dans
+      `40KT1_HQ` — texte prêt dans
+      [`docs/contrat-hq-jumeau.md`](../docs/contrat-hq-jumeau.md). **Ce lot ne se
+      coche qu'à la fusion de la PR dans HQ**, pas à son ouverture.
 
 ## Phase 1 — Observation seule
 
-> Bloquée par `P00.3`. Aucune alerte poussée, aucune réponse : on mesure le bruit
-> de fond. Ordre réel : `P01.7` → `P01.6` → `P01.0` → `P01.2` → `P01.1` →
+> **Débloquée** : `ADR-003` est *Acceptée* (2026-09-07). Aucune alerte poussée,
+> aucune réponse : on mesure le bruit de fond. Ordre réel : `P01.7` → `P01.6` → `P01.0` → `P01.2` → `P01.1` →
 > `P01.8` → `P01.3` → `P01.4` → `P01.9` → `P01.5`.
 
 - [ ] **P01.7** (cursor) Instrumentation de la période d'observation : protocole
@@ -129,7 +140,8 @@ alerte réelle traitée de bout en bout.
 
 ## Phase 3 — Réponse
 
-> Bloquée par `P00.4`. L'exécuteur se livre en trois lots : le noyau et ses
+> **Débloquée pour l'écriture** : `ADR-002` est *Acceptée* (2026-09-07). Rien
+> n'est armé pour autant — les cinq portes de l'armement sont dans `ADR-002` § 6. L'exécuteur se livre en trois lots : le noyau et ses
 > gardes **avant** le premier geste privilégié.
 
 - [ ] **P03.0** (claude) `responder/` — catalogue déclaratif, budget horaire,
@@ -145,7 +157,11 @@ alerte réelle traitée de bout en bout.
       [brief](briefs/P03.2-runbook-mode-a-blanc.md).
 - [ ] **P03.3** (cursor + PO) Runbook de désarmement d'urgence **testé depuis un
       téléphone** — [brief](briefs/P03.3-runbook-desarmement.md).
-- [ ] **P03.4** (PO) Armement du catalogue minimal, hors mode tournoi d'abord.
+- [ ] **P03.4** (claude — préparation · **PO — le geste**) Armement du catalogue
+      minimal, hors mode tournoi d'abord. Les **cinq portes** sont posées
+      (`ADR-002` § 6) ; restent le runbook rendu jouable, qui s'écrit sur le
+      journal réel de l'exécuteur (`P03.0`–`P03.1`), et le geste lui-même.
+      **Aucun agent n'arme** : `RULES` § 1.
 - [ ] **P03.5** (à trancher) Vue « sécurité » dans le cockpit ops de HQ — vit
       dans `40KT1_HQ`, pas ici.
 
