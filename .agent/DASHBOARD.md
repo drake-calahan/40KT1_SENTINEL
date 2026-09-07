@@ -51,3 +51,4 @@ Les trois ADR restent *Proposé* jusqu'à `P00.2`–`P00.4`. **Rien n'est armé.
 |------|-----------|
 | 2026-09-07 | Proposition rendue (questionnaire 30 questions + solution). Dépôt amorcé : harnais `.agent/`, couche Cursor, 3 ADR *Proposé*, plan `P01`, contrat de frontière, squelette Ansible, CI. Aucune machine touchée. |
 | 2026-09-07 | Cadrage consigné : 30 réponses dans `ACTIVE.md`, clarifications PO (C1 standby/bluefin, C2 zéro budget, A3/F4/H2). Focus TASKS → formalisation ADR `P00.2`–`P00.6`. |
+| 2026-09-07 | Lancement cadré (`P00.10`) : plan `P02` — 27 lots en six vagues, répartis 12 `cursor` / 11 `claude` / 3 PO (+1 à trancher), briefs des lots `cursor` dans `.agent/briefs/`. Deux lots ajoutés au passage : nettoyage post-amorce (`P00.7`) et garde CI d'armement (`P00.8`). **Rien n'est armé.** |

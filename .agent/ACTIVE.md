@@ -13,9 +13,16 @@
 8 blocs) a reçu les réponses du PO le **2026-09-07**. Les quatre STRUCTURANTES
 sont tranchées et consignées ci-dessous § « Réponses au cadrage ».
 
-**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus) : `P00.2` → `P00.3` →
-`P00.4` → `P00.5` → `P00.6`. Écrire les rôles Ansible **seulement après**
-`ADR-003` *Accepté*.
+**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus) : `P00.6` d'abord — tant
+que l'amorce n'est pas sur `main`, aucune branche n'a de base. Ensuite, en
+parallèle : `P00.7`, `P00.8`, `P00.2`, `P01.7` (`cursor`) et
+`P00.3` → `P00.4` → `P00.5` (`claude`). Écrire les rôles Ansible **seulement
+après** `ADR-003` *Accepté*.
+
+**Le lancement est cadré** : découpage en lots, affectation et ordre des vagues
+dans [`docs/plans/P02`](../docs/plans/P02-lancement-implementation.md) ; briefs
+des lots `cursor` dans [`briefs/`](briefs/). Un lot `cursor` ne part pas sans son
+brief au statut `prêt`.
 
 ### Quatre décisions structurantes — tranchées au cadrage
 
@@ -83,6 +90,7 @@ qui se posent le même verrou est un mode de panne connu.
 | Plan | Sujet | État |
 |------|--------|------|
 | [`P01`](../docs/plans/P01-mise-en-service.md) | Mise en service, phases P0 → P4 | **P0** — cadrage consigné ; suite = ADR *Accepté* |
+| [`P02`](../docs/plans/P02-lancement-implementation.md) | Lancement : découpage des lots, affectation, vagues | **actif** — vague 0 bloquée par `P00.6` |
 
 ## ADR
 
