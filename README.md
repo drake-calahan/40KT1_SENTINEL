@@ -5,19 +5,20 @@
 
 ---
 
-> **État du dépôt : amorce.** Rien n'est installé, rien n'est décidé.
-> Le cadrage attend des réponses, et **quatre questions doivent être tranchées
-> avant le premier rôle Ansible** : `C1` (où vit le serveur central) ·
-> `E2` (catalogue de réponse) · `E4` (mode tournoi) ·
-> `H3` (frontière de propriété avec HQ).
+> **État du dépôt : cadrage répondu.** Trente réponses sur trente (2026-09-07) ;
+> les quatre structurantes (`C1`, `E2`, `E4`, `H3`) sont tranchées.
+> `ADR-002` et `ADR-003` sont *Acceptées* ; `ADR-001` reste *Proposé* (`P00.2`).
+> **Rien n'est installé, rien n'est armé** — aucune machine du parc ne porte
+> quoi que ce soit de ce dépôt.
 >
-> Questionnaire : [`docs/cadrage/questionnaire.md`](docs/cadrage/questionnaire.md).
+> Réponses : [`.agent/ACTIVE.md`](.agent/ACTIVE.md) § « Réponses au cadrage »
+> et [`docs/cadrage/questionnaire-reponse.md`](docs/cadrage/questionnaire-reponse.md).
 
 ## Trois portes
 
 | Tu es… | Va ici | En une phrase |
 |--------|--------|----------------|
-| **PO / décideur** | [`docs/cadrage/questionnaire.md`](docs/cadrage/questionnaire.md) | Trente questions, un défaut proposé par question |
+| **PO / décideur** | [`docs/plans/P01-mise-en-service.md`](docs/plans/P01-mise-en-service.md) | Ce qui vient ensuite, phase par phase |
 | **Agent IA** (Claude Code, Cursor) | [`AGENTS.md`](AGENTS.md) | Harnais `.agent/` — lire avant toute modif |
 | **Ops** | [`docs/runbooks/`](docs/runbooks/) | Procédures — **aucune n'est jouable aujourd'hui** |
 
