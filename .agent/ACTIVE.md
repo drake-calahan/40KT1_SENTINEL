@@ -49,7 +49,7 @@ documenté par un runbook.
 | Agent sur `patator-standby` | absent | `P1` |
 | Serveur central | absent | `P1` — hôte **tranché** : `patator-standby` frugal |
 | Alerte Discord + push | non câblée | `P2` |
-| Réponse à blanc | non | `P3` |
+| Réponse à blanc | non — noyau livré, aucun geste câblé | `P3` |
 | Réponse armée | non | `P3` |
 | Agent sur `AEGIS-TOWER` | absent | `P4` |
 

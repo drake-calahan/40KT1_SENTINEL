@@ -144,9 +144,11 @@ alerte réelle traitée de bout en bout.
 > n'est armé pour autant — les cinq portes de l'armement sont dans `ADR-002` § 6. L'exécuteur se livre en trois lots : le noyau et ses
 > gardes **avant** le premier geste privilégié.
 
-- [ ] **P03.0** (claude) `responder/` — catalogue déclaratif, budget horaire,
-      lecture du mode tournoi, lecture du témoin de désarmement. Tests sur les
-      **refus** autant que sur les gestes.
+- [x] **P03.0** (claude, 2026-09-07) `responder/` — noyau : catalogue déclaratif,
+      quatre gardes dans l'ordre, budget à trois états, journal JSONL (gestes
+      **et** refus), dégel tracé. 36 tests, dont les quatre refus obligatoires et
+      les cas de dégradation. `ruff` + `pytest` verts. **Aucun geste privilégié :
+      rien ne peut être joué.**
 - [ ] **P03.6** (claude) Les quatre gestes armables du catalogue, chacun avec son
       retour arrière : blocage d'IP à expiration, arrêt de processus, arrêt de
       conteneur, mise en quarantaine d'un fichier.
