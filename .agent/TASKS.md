@@ -60,8 +60,8 @@ partie, toujours.**
 - [ ] **P00.7** (cursor) Nettoyage post-amorce : `AMORCE.md` retiré, `README` et
       `docs/README` remis à l'état réel du 2026-09-07 —
       [brief](briefs/P00.7-nettoyage-post-amorce.md).
-- [ ] **P00.8** (cursor) Garde CI « rien n'est armé » : la case de la checklist
-      devient un contrôle qui échoue —
+- [x] **P00.8** (cursor, 2026-09-07) Garde CI « rien n'est armé » : la case de la
+      checklist devient un contrôle qui échoue —
       [brief](briefs/P00.8-garde-ci-armement.md).
 - [ ] **P00.2** (cursor) `ADR-001` (moteur et profil) passe *Proposé* → *Accepté*,
       à partir des réponses `A2`, `A3`, `A4`, `C2`, `F4` consignées —

@@ -16,7 +16,7 @@ Tâche : `TASKS#P0X.Y`
 
 ## Garde-fous de ce dépôt
 
-- [ ] **Aucun `*_enabled` passé à `true`** — cette PR n'arme rien
+- [ ] **Aucun `*_enabled` passé à `true`** — **vérifié par la CI `garde-armement`**
 - [ ] Aucun secret dans le diff (`.env.example` seul est éditable)
 - [ ] Sentinelle **ajoute** : rien de ce qui appartient à `40KT1_HQ` n'est
       réécrit (politique `ufw`, Docker, Tailscale, mode tournoi)

@@ -91,7 +91,7 @@ confirmation ; **une confirmation n'est pas un ordre PO**. La règle reste :
 
 - [ ] Branche `cursor/*` (pas de commit orphelin sur `main`)
 - [ ] Pas de secret / `.env` dans le diff
-- [ ] Aucun `SENTINEL_*_ENABLED` passé à `true` dans le diff
+- [ ] Aucun `SENTINEL_*_ENABLED` passé à `true` dans le diff — **vérifié par la CI `garde-armement`**
 - [ ] `ansible-lint` + `yamllint` verts si `infra/` touché
 - [ ] `ruff` + `pytest` verts si `responder/` touché
 - [ ] Docs FR à jour si un comportement visible change
