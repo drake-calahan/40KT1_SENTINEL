@@ -1,0 +1,16 @@
+---
+# Collections Ansible — source UNIQUE, lue par la CI et par le poste d'admin.
+#
+# Les lister ici plutôt que dans le workflow évite le défaut classique : une
+# collection ajoutée à un playbook rend le gate CI vert alors que le poste
+# d'administration est cassé, ou l'inverse.
+#
+# Versions épinglées, même raisonnement que dans 40KT1_HQ : sans épinglage, le
+# gate vire au rouge tout seul un matin, sans qu'une ligne du dépôt ait changé.
+collections:
+  - name: community.general
+    version: "9.5.0"
+  - name: ansible.posix
+    version: "1.5.4"
+  - name: community.docker
+    version: "3.13.0"

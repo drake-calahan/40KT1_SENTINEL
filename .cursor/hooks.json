@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "prompt",
+        "timeout": 15,
+        "prompt": "Inject a short additional_context reminder for 40KT1_SENTINEL: (1) this repo targets two PRODUCTION machines (patator-tower, patator-standby) - ansible-playbook needs --check --diff first and an explicit PO order before any apply, (2) everything is disarmed by default; no commit may arm a timer, an alert or an automatic response, (3) read AGENTS.md and .agent/RULES.md, then .agent/ACTIVE.md, (4) branch cursor/<task>, never push main, (5) no MCP hub here - TASKS.md committed is the only shared state, check no [~] task is held by claude, (6) never edit .env or secrets; never delete docs. Keep under 90 words."
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "python .cursor/hooks/guard_shell.py",
+        "matcher": "git\\s+push|\\.env\\b|gh\\s+secret|ansible-playbook|systemctl|SENTINEL_[A-Z_]*ENABLED|response-disarmed",
+        "failClosed": true,
+        "timeout": 20
+      }
+    ]
+  }
+}

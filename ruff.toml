@@ -1,0 +1,29 @@
+# Ruff — lint + format, version épinglée en CI.
+#
+# Même raisonnement que dans 40KT1_HQ : les règles de format bougent entre
+# releases, et un gate stable exige la même version qu'en dev. La version vit
+# dans le workflow ; ce fichier ne porte que les règles.
+
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "S",    # bandit — ce dépôt exécute des gestes privilégiés
+    "RUF",
+]
+ignore = [
+    "E501",  # longueur gérée par le formateur
+]
+
+[lint.per-file-ignores]
+# Les tests ont le droit d'utiliser `assert` (S101) et des chemins en dur.
+"**/tests/**" = ["S101", "S108"]
+
+[format]
+quote-style = "double"

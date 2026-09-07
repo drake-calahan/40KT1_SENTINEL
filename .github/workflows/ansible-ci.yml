@@ -1,0 +1,66 @@
+---
+name: Ansible CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/ansible/**'
+      - '.github/workflows/ansible-ci.yml'
+  pull_request:
+    paths:
+      - 'infra/ansible/**'
+      - '.github/workflows/ansible-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Ansible & YAML Lint
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Versions ÉPINGLÉES. Sans épinglage, ce job vire au rouge tout seul un
+      # matin, sans qu'une ligne du dépôt ait changé — et un gate qui rougit
+      # sans cause finit par être ignoré.
+      #
+      # Les collections sont installées depuis `requirements.yml` et non listées
+      # ici : la liste ne vit ainsi qu'à un seul endroit, celui que lit aussi le
+      # poste d'administration. Une collection ajoutée à un playbook ne peut
+      # plus rendre ce gate vert alors que le poste d'admin est cassé.
+      - name: Install ansible-lint, yamllint & collections
+        run: |
+          python -m pip install --upgrade pip
+          pip install "ansible-core==2.17.*" "ansible-lint==24.*" "yamllint==1.35.*"
+          ansible-galaxy collection install -r infra/ansible/requirements.yml
+
+      - name: yamllint
+        run: |
+          yamllint -d "{extends: relaxed, rules: {line-length: disable}}" infra/ansible/
+
+      # `playbooks/` est vide en phase 0 : le glob ne doit pas faire échouer le
+      # job pour autant. On lint ce qui existe, et pas plus.
+      - name: ansible-lint
+        working-directory: infra/ansible
+        run: |
+          shopt -s nullglob
+          files=(playbooks/*.yml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Aucun playbook a linter (phase 0) — voir playbooks/README.md"
+            exit 0
+          fi
+          ansible-lint "${files[@]}"
+        shell: bash

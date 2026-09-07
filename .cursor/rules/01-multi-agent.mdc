@@ -1,0 +1,27 @@
+---
+description: Coexistence Claude Code / Cursor — sans hub MCP
+alwaysApply: true
+---
+
+# Deux agents, pas de hub
+
+Ce dépôt est partagé avec **Claude Code** uniquement. Pas de Codex, pas
+d'Antigravity, **pas de serveur MCP de coordination**.
+
+## Ce qui remplace le hub
+
+- `TASKS.md` **committé** est le seul état partagé. `[~]` porte l'agent et la date.
+- Ne jamais prendre une tâche déjà `[~]` par `claude` sans redistribution du PO.
+- Les branches ne se croisent pas : `cursor/<tâche>` d'un côté, `claude/<tâche>`
+  de l'autre. Base = `origin/main` frais.
+- En cas de doute sur qui tient quoi : demander au PO. Ne pas deviner.
+
+## Protocole
+
+1. Branche `cursor/<tâche>` depuis `origin/main` frais — jamais livrer depuis `main`.
+2. Une tâche suivie à la fois ; ne pas élargir le périmètre.
+3. Committer, valider au niveau revendiqué, répondre avec branche + SHA + preuves.
+4. Cocher `TASKS.md` seulement après commit **et** validations vertes.
+
+Si un souvenir de session mentionne `get_context`, `claim` ou des locks : il
+parle de `40KT1_HQ`, pas de ce dépôt.

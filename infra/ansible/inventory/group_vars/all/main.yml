@@ -1,0 +1,71 @@
+---
+# Variables partagées par tous les hôtes — Sentinelle.
+#
+# AUCUN SECRET ICI. Les trois secrets du dispositif (clé d'enrôlement, jeton
+# d'API, webhook Discord) vivent dans le `.env` de la machine, gitignoré.
+# Ce fichier pose des chemins et des seuils, pas des valeurs sensibles.
+
+sentinel_name: "sentinel"
+
+# --- Armement ---------------------------------------------------------------
+# TOUT est désarmé par défaut, et ce n'est pas de la prudence de façade :
+# armer est un geste d'exploitation, décrit par un runbook, joué par un humain.
+# Un rôle qui armerait quelque chose au passage rendrait la question « qu'est-ce
+# qui tourne sur cette machine ? » impossible à répondre autrement qu'en s'y
+# connectant.
+#
+# L'ordre d'armement est celui du runbook : agent -> alerte -> réponse à blanc
+# -> réponse armée. Chaque étape se pose avec sa propre variable, en `-e`.
+sentinel_agent_enabled: false
+sentinel_server_enabled: false
+sentinel_alerting_enabled: false
+sentinel_response_enabled: false
+sentinel_response_dry_run: true
+
+# --- Budget de remédiation (ADR-002) ----------------------------------------
+# Trois gestes automatiques par heure glissante. Le troisième déclenche un
+# rouge ; au-delà, le dispositif cesse d'agir jusqu'à intervention humaine.
+# Aligné sur ADR-062 de 40KT1_HQ. Modifier ce nombre est une décision d'ADR,
+# pas un réglage d'inventaire.
+sentinel_response_budget_per_hour: 3
+
+# --- Chemins ----------------------------------------------------------------
+sentinel_install_dir: "/opt/sentinel"
+sentinel_state_dir: "/var/lib/sentinel"
+sentinel_log_dir: "/var/log/sentinel"
+
+# Témoin de désarmement d'urgence, lu AVANT tout geste. C'est le frein hors
+# bande — celui qui ne demande que SSH.
+sentinel_disarm_file: "{{ sentinel_state_dir }}/response-disarmed"
+
+# --- Ce qui appartient à 40KT1_HQ, et qu'on LIT seulement -------------------
+# Le mode tournoi est posé et retiré par le PO, côté HQ. Sentinelle le lit.
+# Deux automates qui se posent le même verrou est un mode de panne connu.
+hq_tournament_mode_file: "{{ hq_stack_dir }}/node-state/tournament-mode"
+
+# Chemin du pousseur d'alerte de HQ, réutilisé tel quel : un seul mécanisme,
+# une seule preuve de câblage, deux destinations (salon et sujet distincts).
+hq_notify_script: "{{ hq_stack_dir }}/scripts/notify.sh"
+
+# --- Bornage des ressources -------------------------------------------------
+# Plafond appliqué au serveur central quand il cohabite avec un nœud de
+# production (cas (a) d'ADR-003). Ce qui rend la condition VÉRIFIABLE plutôt
+# que déclarative : sur les 16 Go du standby, 1,5 Go laisse le miroir Postgres
+# et la relève en lecture seule respirer.
+sentinel_server_memory_max: "1500M"
+sentinel_server_cpu_quota: "40%"
+
+# --- Intégrité : la liste courte, surveillée en temps réel (D1) -------------
+# Volontairement COURTE. Trop large, le contrôle produit du bruit à chaque
+# déploiement et finit désactivé ; trop étroit, il ne voit pas la porte dérobée.
+sentinel_fim_realtime_paths:
+  - /etc
+  - "{{ hq_stack_dir }}/.env"
+  - "{{ ansible_facts['env']['HOME'] | default('/home/' ~ ansible_user) }}/.ssh/authorized_keys"
+  - /etc/systemd/system
+  - "{{ hq_stack_dir }}/docker-compose.yml"
+  - "{{ hq_stack_dir }}/scripts"
+  - /usr/bin/tailscale
+
+# Balayage complet, cadence lente (D2).
+sentinel_fim_scan_interval: "12h"

@@ -1,0 +1,32 @@
+---
+description: Exécuteur de réponse et outillage Python — le composant le plus sensible
+globs: responder/**,scripts/**,*.py
+alwaysApply: false
+---
+
+# Python — `responder/` et outillage
+
+L'exécuteur de réponse est **le composant le plus sensible du dépôt** : il
+exécute des gestes privilégiés sur des machines de production.
+
+## Règles
+
+- Type hints partout ; `ruff` lint + format ; `pytest`.
+- **Tester les refus autant que les gestes** : geste hors catalogue, budget
+  épuisé, mode tournoi actif, témoin de désarmement présent. Un exécuteur dont
+  seuls les succès sont testés n'est pas testé.
+- **Le catalogue est fermé et déclaratif.** Un geste absent du catalogue est
+  refusé, même si l'ordre est bien formé. Ne jamais construire une commande
+  depuis une chaîne reçue du serveur central.
+- **Le serveur central ordonne, le nœud vérifie et exécute.** Catalogue, budget,
+  mode tournoi et désarmement sont évalués **localement**, jamais côté serveur.
+- **Journaliser chaque geste ET chaque refus**, avec le motif. Au matin, on doit
+  pouvoir lire ce que la machine a fait sans nous — et ce qu'elle n'a pas fait.
+- Les sondes distinguent `ok`, `ko` et **`unknown`**. Jamais de faux vert.
+
+## Interdits
+
+Restaurer une base · revenir à une version antérieure · promouvoir le standby en
+écriture · modifier une donnée métier · faire tourner un secret. Ces gestes ne
+sont pas hors catalogue parce qu'ils sont dangereux, mais parce que **les défaire
+demande un arbitrage**.

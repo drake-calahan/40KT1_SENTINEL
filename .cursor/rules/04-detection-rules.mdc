@@ -1,0 +1,36 @@
+---
+description: Règles de détection — du code, pas de la configuration
+globs: rules/**
+alwaysApply: false
+---
+
+# Règles de détection
+
+**Une règle de détection est du code.** Versionnée, revue en PR, jamais éditée à
+la main sur une machine.
+
+## Conventions
+
+- Un fichier par famille (`integrite/`, `authentification/`, `docker/`,
+  `conformite/`, `agents/`).
+- **Chaque règle porte un commentaire en français** disant *ce qu'elle attrape*
+  et *ce qui la ferait crier à tort*. Elle sera relue pendant un incident.
+- Chaque règle porte une **sévérité** de la grille : `critique`, `rouge`,
+  `orange`, `info` — calquée sur `watchdog.py` de HQ.
+- Une règle qui déclenche une **réponse** nomme le geste du catalogue, jamais une
+  commande.
+
+## Bruit
+
+- **Agréger, ne pas répéter.** Fenêtre de 15 min avec compteur ; le compteur est
+  l'information, pas les 143 messages.
+- **Les gestes normaux du parc ne sont pas des alertes** : déploiement,
+  sauvegarde de 03:30, ingest, rotation de journaux, `unattended-upgrades`.
+  Toute exclusion est écrite **avec sa justification**.
+- **La perte de contact avec l'agent de `patator-standby`** est agrégée par
+  construction : ce nœud a un défaut réseau récidivant (4 occurrences connues).
+  Voir `.agent/DISCOVERY.md`.
+
+## Ce qui ne doit jamais entrer dans une règle
+
+Une donnée nominative de joueur. Si une règle en capture, elle est mal écrite.

@@ -1,0 +1,66 @@
+---
+name: Python CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'responder/**'
+      - 'scripts/**'
+      - 'ruff.toml'
+      - '.github/workflows/python-ci.yml'
+  pull_request:
+    paths:
+      - 'responder/**'
+      - 'scripts/**'
+      - 'ruff.toml'
+      - '.github/workflows/python-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: ruff & pytest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Version de ruff ÉPINGLÉE : les règles de format bougent entre releases,
+      # et un gate stable exige la même version qu'en dev.
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install "ruff==0.6.*" "pytest==8.*"
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format --check
+        run: ruff format --check .
+
+      # `responder/` est vide en phase 0. `pytest` rend 5 (« no tests collected »)
+      # dans ce cas : c'est un état attendu, pas un échec. Il cessera de l'être
+      # dès le premier test — et alors un vrai échec redeviendra rouge.
+      - name: pytest
+        run: |
+          set +e
+          python -m pytest -q
+          code=$?
+          if [ $code -eq 5 ]; then
+            echo "Aucun test collecte (phase 0) — voir responder/README.md"
+            exit 0
+          fi
+          exit $code
+        shell: bash

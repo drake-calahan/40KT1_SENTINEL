@@ -1,0 +1,21 @@
+---
+description: Documentation FR — ADR, runbooks, harnais .agent (ne pas supprimer)
+globs: docs/**,.agent/**,AGENTS.md,CLAUDE.md,README.md
+alwaysApply: false
+---
+
+# Documentation
+
+- Langue de production : **français**.
+- Ne **jamais** supprimer un fichier doc sans demande explicite du PO.
+- **Archiver** = `git mv` vers `.agent/archive/` ou `docs/archive/` + stub à
+  l'ancien chemin.
+- **Une décision d'architecture = un ADR**, numéroté, **avant** l'implémentation.
+  Gabarit : `docs/adr/_TEMPLATE.md`. Statuts : Proposé · Accepté · Suspendu ·
+  Sans objet · Remplacé par ADR-XXX.
+- **Un runbook décrit un geste jouable.** S'il décrit une intention, il porte un
+  encadré disant qu'il n'est pas encore jouable — un runbook qui ment sur son
+  propre état a déjà coûté un incident dans HQ.
+- `ACTIVE.md` est mis à jour dès qu'une phase, un armement ou une décision change.
+  C'est le seul fichier qui dit **ce qui est armé** : le laisser vieillir revient
+  à perdre la trace de ce qui tourne sur les machines.

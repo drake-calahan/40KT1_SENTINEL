@@ -1,0 +1,15 @@
+# Fins de ligne normalisées : le parc mélange Windows (AEGIS-TOWER) et Linux.
+* text=auto eol=lf
+
+# Les scripts joués sur les nœuds DOIVENT rester en LF, quel que soit le poste
+# qui les édite. Un CRLF dans un script shell rend « bad interpreter », et le
+# message n'accuse jamais la bonne cause.
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# Sauf ceux qui tournent sous PowerShell, côté poste.
+*.ps1  text eol=crlf
+
+*.md   text eol=lf diff=markdown
