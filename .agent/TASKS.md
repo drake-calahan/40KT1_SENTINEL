@@ -87,10 +87,10 @@ partie, toujours.**
 > aucune réponse : on mesure le bruit de fond. Ordre réel : `P01.7` → `P01.6` → `P01.0` → `P01.2` → `P01.1` →
 > `P01.8` → `P01.3` → `P01.4` → `P01.9` → `P01.5`.
 
-- [ ] **P01.7** (cursor) Instrumentation de la période d'observation : protocole
-      et journal des faux positifs, avec le troisième état `indeterminee` —
-      [brief](briefs/P01.7-instrumentation-observation.md). *Non bloqué par
-      `ADR-003` : aucun fichier de machine.*
+- [x] **P01.7** (cursor, 2026-09-08) Instrumentation de la période d'observation :
+      protocole et journal des faux positifs, avec le troisième état
+      `indeterminee` — [brief](briefs/P01.7-instrumentation-observation.md).
+      *Non bloqué par `ADR-003` : aucun fichier de machine.*
 - [ ] **P01.6** (claude) **Gabarit de rôle Ansible** : disposition, garde
       `*_enabled`, politique « aucun redémarrage d'un service de HQ », bilan de
       fin de rôle avec le nombre d'hôtes touchés, playbook `00_check.yml`,
