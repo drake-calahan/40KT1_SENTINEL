@@ -54,11 +54,11 @@ partie, toujours.**
 - [x] **P00.10** (claude) Cadrage du lancement : découpage en lots, affectation
       `claude` / `cursor` / `PO`, briefs des lots `cursor`.
       → [`docs/plans/P02`](../docs/plans/P02-lancement-implementation.md).
-- [ ] **P00.6** (PO) Fusionner l'amorce sur `main`, activer la **protection de
-      branche** (PR obligatoire, pas de push direct), vérifier que les trois
-      workflows tournent. **Bloque tout le reste.**
-- [ ] **P00.7** (cursor) Nettoyage post-amorce : `AMORCE.md` retiré, `README` et
-      `docs/README` remis à l'état réel du 2026-09-07 —
+- [x] **P00.6** (PO, 2026-09-07) Amorce sur `main` (PR #1 / #4) ; ruleset
+      `main-protection` (PR obligatoire, pas de push direct ni force-push) ;
+      trois workflows verts sur `main` (Ansible CI, Python CI, Secrets scan).
+- [x] **P00.7** (cursor, 2026-09-07) Nettoyage post-amorce : `AMORCE.md` retiré,
+      `README` remis à l'état réel du 2026-09-07 —
       [brief](briefs/P00.7-nettoyage-post-amorce.md).
 - [ ] **P00.8** (cursor) Garde CI « rien n'est armé » : la case de la checklist
       devient un contrôle qui échoue —
