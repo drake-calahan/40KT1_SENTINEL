@@ -102,7 +102,7 @@ qui se posent le même verrou est un mode de panne connu.
 
 | # | Décision | Statut |
 |---|----------|--------|
-| [001](../docs/adr/ADR-001-moteur-et-profil-de-deploiement.md) | Moteur de détection et profil de déploiement | **Proposé** — à accepter (`P00.2`) |
+| [001](../docs/adr/ADR-001-moteur-et-profil-de-deploiement.md) | Moteur de détection et profil de déploiement | **Accepté** (2026-09-07) |
 | [002](../docs/adr/ADR-002-catalogue-et-budget-de-reponse.md) | Catalogue de réponse, budget, mode tournoi | **Accepté** 2026-09-07 — débloque `P3` ; porte les **conditions d'armement** |
 | [003](../docs/adr/ADR-003-hote-du-serveur-central.md) | Hôte du serveur central | **Accepté** 2026-09-07 — débloque `P1` ; **revue le 2027-03-07** |
 
