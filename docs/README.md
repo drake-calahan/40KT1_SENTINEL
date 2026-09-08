@@ -15,6 +15,7 @@ Point d'entrée unique. Une intention par porte.
 | [Plans](plans/) | PO, agents | `P01` — mise en service, phases P0 → P4 · `P02` — découpage et affectation des lots |
 | [Runbooks](runbooks/) | Ops | Procédures — **aucune n'est jouable aujourd'hui** |
 | [Contrat HQ](contrat-hq.md) | Architecte, ops | Frontière de propriété avec `40KT1_HQ` |
+| [Observation](observation/) | PO | Protocole et journal de la période `D5` |
 | [Harnais agents](../AGENTS.md) | Claude Code, Cursor | Protocole multi-outil |
 
 ## État réel, au 2026-09-07
