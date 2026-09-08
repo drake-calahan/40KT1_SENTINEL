@@ -63,8 +63,8 @@ partie, toujours.**
 - [ ] **P00.8** (cursor) Garde CI « rien n'est armé » : la case de la checklist
       devient un contrôle qui échoue —
       [brief](briefs/P00.8-garde-ci-armement.md).
-- [ ] **P00.2** (cursor) `ADR-001` (moteur et profil) passe *Proposé* → *Accepté*,
-      à partir des réponses `A2`, `A3`, `A4`, `C2`, `F4` consignées —
+- [x] **P00.2** (cursor, 2026-09-07) `ADR-001` (moteur et profil) *Acceptée*, à
+      partir des réponses `A2`, `A3`, `A4`, `C2`, `F4` consignées —
       [brief](briefs/P00.2-adr-001-accepte.md).
 - [x] **P00.3** (claude, 2026-09-07) `ADR-003` **Acceptée** : hôte
       `patator-standby` en profil frugal, quatre conditions rendues vérifiables
