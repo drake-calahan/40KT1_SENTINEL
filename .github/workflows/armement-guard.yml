@@ -1,0 +1,35 @@
+---
+name: Garde armement
+
+# Garantit : aucune ligne *ajoutée* dans une PR ne pose littéralement un
+# armement (`*_enabled: true`, sortie du mode à blanc). Le script est
+# relançable en local : `.github/scripts/garde-armement.sh origin/main`.
+#
+# Ne garantit pas : la résolution de variables Ansible, un `-e` passé à la
+# main, ni une valeur calculée dans l'inventaire. Ce n'est pas un dispositif
+# de sécurité — c'est un garde-fou de relecture qui échoue à la place d'une
+# case cochée à la main.
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  garde-armement:
+    name: garde-armement
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuser un armement littéral dans le diff
+        run: .github/scripts/garde-armement.sh "origin/${{ github.base_ref }}"
