@@ -53,9 +53,11 @@ sentinel_server_repo_key_url: "https://packages.wazuh.com/key/GPG-KEY-WAZUH"
 # espèce : une empreinte de clé publique est faite pour être publiée. Sa valeur
 # tient précisément à ce que tout le monde puisse la comparer. La garder secrète
 # n'aurait aucun sens — on ne pourrait plus vérifier la clé contre elle.
-# L'exception est posée en ligne plutôt que dans `.gitleaksignore` parce que
-# cette valeur est destinée à CHANGER (elle sera relevée sur la source
-# officielle), ce qui périmerait une empreinte indexée par SHA de commit.
+#
+# Ce commentaire ne couvre que les commits À VENIR qui toucheront cette ligne —
+# nécessaire, puisque la valeur changera quand elle sera relevée sur la source
+# officielle. Le commit qui l'a introduite est éteint par `.gitleaksignore` :
+# le gate scanne l'historique, pas l'arbre de travail.
 sentinel_server_repo_key_fingerprint: "0DCFCA5547B19D2A6099506096B3EE5F29111145"  # gitleaks:allow
 sentinel_server_repo_key_confirmee: false
 sentinel_server_repo_url: "https://packages.wazuh.com/4.x/apt/"

@@ -6,28 +6,31 @@
 # supprimer. Ce fichier est la porte de sortie du gate secrets — il se relit
 # en revue, comme du code.
 #
-# --- DEUX MÉCANISMES, ET QUAND CHOISIR L'UN OU L'AUTRE ------------------------
+# --- DEUX MÉCANISMES, ET IL EN FAUT SOUVENT DEUX -----------------------------
 #
-# 1. UNE ENTRÉE ICI, indexée par SHA de commit. À préférer quand la ligne
-#    incriminée est FIGÉE : l'exception est alors centralisée, et ce fichier
-#    reste l'endroit unique où l'on voit tout ce qui a été laissé passer.
+# ⚠️ **Le gate scanne l'HISTORIQUE, pas l'arbre de travail.** La commande est
+# `gitleaks detect --log-opts=<base>^..<tête>` : une trouvaille introduite par un
+# commit reste signalée tant que ce commit est dans la plage, **même si un commit
+# ultérieur corrige la ligne**. C'est la leçon payée le 2026-09-09 : un
+# `gitleaks:allow` ajouté après coup n'a rien éteint.
 #
-# 2. UN COMMENTAIRE `gitleaks:allow` EN LIGNE, à côté de la valeur. À préférer
-#    quand la valeur est destinée à CHANGER : une empreinte indexée par SHA se
-#    périme au premier commit qui touche la ligne, et le gate rougit alors sans
-#    cause réelle — ce qui apprend à passer outre, c'est-à-dire exactement ce
-#    qu'un gate de secrets ne doit jamais apprendre.
+# 1. UNE ENTRÉE ICI, indexée par SHA. C'est le **seul** mécanisme qui éteint une
+#    trouvaille déjà commitée. Obligatoire dès qu'un commit poussé la porte.
 #
-#    Le prix de ce second mécanisme est qu'une exception n'apparaît plus ici. On
-#    le paie sciemment : le motif, lui, est écrit à l'endroit où un relecteur
-#    tombera dessus, ce qui vaut mieux qu'un renvoi.
+# 2. UN COMMENTAIRE `gitleaks:allow` EN LIGNE. Il n'agit que sur les commits
+#    À VENIR qui touchent la ligne. Utile quand la valeur est destinée à changer :
+#    sans lui, chaque modification produirait une trouvaille neuve, donc une
+#    entrée de plus ici — et un gate qui exige une exception à chaque édition
+#    apprend à passer outre, ce qu'un gate de secrets ne doit jamais apprendre.
 #
-#    Exceptions en ligne à ce jour :
-#      - infra/ansible/roles/sentinel_server/defaults/main.yml —
-#        `sentinel_server_repo_key_fingerprint`. Empreinte d'une clé PUBLIQUE de
-#        dépôt de paquets : 40 caractères hexadécimaux, donc lue comme une
-#        « generic-api-key ». Elle est faite pour être publiée — sa valeur tient
-#        à ce que tout le monde puisse la comparer. Elle doit encore être relevée
-#        sur la source officielle, donc elle changera.
+# Les deux ne s'excluent pas : le 1 couvre le passé, le 2 couvre l'avenir.
 #
-# (aucune exception indexée par SHA à ce jour)
+# --- EXCEPTIONS ---------------------------------------------------------------
+#
+# `sentinel_server_repo_key_fingerprint` — empreinte d'une clé PUBLIQUE de dépôt
+# de paquets. 40 caractères hexadécimaux à forte entropie, donc lue comme une
+# « generic-api-key ». Faux positif : cette valeur est faite pour être publiée —
+# sa fonction tient à ce que tout le monde puisse la comparer, et la garder
+# secrète l'annulerait. Doublée d'un `gitleaks:allow` en ligne, parce qu'elle
+# doit encore être relevée sur la source officielle et changera donc.
+335a815a7de3a5813635a4da9ad61488ebcb8158:infra/ansible/roles/sentinel_server/defaults/main.yml:generic-api-key:50
