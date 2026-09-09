@@ -335,10 +335,11 @@ partie, toujours.**
       vise désormais `/etc/logrotate.d/` · `100150` couvre les artefacts `ucf`.
       Les motifs d'exclusion trop larges (`.tmp`, `.cache`) ont été resserrés
       sur les artefacts réels.
-- [ ] **P01.1** (cursor) Rôle `sentinel_agent` — agents sur `patator-tower` et
-      `patator-standby`, enrôlement par clé, aucun redémarrage de service de
-      production déclenché par le rôle —
-      [brief](briefs/P01.1-role-sentinel-agent.md).
+- [~] **P01.1** (cursor, 2026-09-09) Rôle `sentinel_agent` — agents sur
+      `patator-tower` et `patator-standby`, enrôlement par clé, aucun redémarrage
+      de service de production déclenché par le rôle —
+      [brief](briefs/P01.1-role-sentinel-agent.md). Inclut les suites `P01.11` et
+      `P01.12` (alignement `sentinel_fim_realtime_paths`).
 - [ ] **P01.8** (cursor) Règles authentification et événements Docker —
       [brief](briefs/P01.8-regles-auth-docker.md).
 - [ ] **P01.3** (claude) Règle **anti-rafale** pour la perte de contact d'un

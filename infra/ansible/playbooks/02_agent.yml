@@ -1,0 +1,100 @@
+---
+# 02_agent.yml — Agents Linux du parc. Lot `P01.1`.
+#
+#   cd infra/ansible
+#   ansible-playbook playbooks/02_agent.yml --check --diff
+#
+# `--check --diff` D'ABORD, ordre PO ENSUITE, apply en dernier.
+# Ce playbook POSE des agents désarmés. Il n'arme rien.
+#   armer        : -e '{"sentinel_agent_enabled": true}'   (runbook, humain)
+#   désinstaller : -e '{"sentinel_agent_desinstaller": true}'
+#
+# Prérequis à jouer d'abord : `playbooks/00_check.yml`.
+
+# ══════════════════════════════════════════════════════════════════════════
+# PLAY 1 — Garde de cible (roles/GABARIT.md § 4.3).
+# ══════════════════════════════════════════════════════════════════════════
+- name: Garde de cible — les agents Linux ont-ils des hôtes ?
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tags:
+    - always
+
+  tasks:
+    - name: Le groupe `sentinel_agents_linux` porte au moins un hôte
+      ansible.builtin.assert:
+        that:
+          - groups['sentinel_agents_linux'] is defined
+          - groups['sentinel_agents_linux'] | length > 0
+        fail_msg: >-
+          Le groupe « sentinel_agents_linux » est vide : ce playbook ne toucherait
+          AUCUN hôte et rendrait « ok ». C'est le pire mode de panne du parc.
+        success_msg: >-
+          cibles : {{ groups['sentinel_agents_linux'] | join(', ') }}
+          ({{ groups['sentinel_agents_linux'] | length }} hôte(s))
+        quiet: true
+
+# ══════════════════════════════════════════════════════════════════════════
+# PLAY 2 — Le rôle.
+# ══════════════════════════════════════════════════════════════════════════
+- name: Agents Sentinelle — livrés désarmés, un nœud à la fois
+  hosts: sentinel_agents_linux
+  gather_facts: true
+  become: false
+  serial: 1
+
+  pre_tasks:
+    - name: Charger l'épingle unique du moteur (portée par le rôle serveur)
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../roles/sentinel_server/defaults/main.yml"
+      tags:
+        - always
+
+  roles:
+    - role: sentinel_agent
+      tags:
+        - sentinel_agent
+
+# ══════════════════════════════════════════════════════════════════════════
+# PLAY 3 — Bilan de play : combien d'hôtes ont RÉELLEMENT été touchés.
+# ══════════════════════════════════════════════════════════════════════════
+- name: Bilan de play — hôtes visés contre hôtes atteints
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tags:
+    - always
+
+  vars:
+    vises: "{{ groups['sentinel_agents_linux'] | default([]) }}"
+    atteints: >-
+      {{ vises | map('extract', hostvars)
+               | selectattr('ansible_facts.distribution', 'defined')
+               | map(attribute='inventory_hostname') | list }}
+
+  tasks:
+    - name: Compte des hôtes visés et atteints
+      ansible.builtin.debug:
+        msg:
+          - "visés    ({{ vises | length }}) : {{ vises | join(', ') }}"
+          - "atteints ({{ atteints | length }}) : {{ atteints | join(', ') | default('AUCUN', true) }}"
+
+    - name: Refuser de conclure si aucun hôte n'a été atteint
+      ansible.builtin.assert:
+        that:
+          - atteints | length > 0
+        fail_msg: >-
+          AUCUN hôte n'a été atteint : ce playbook n'a RIEN posé, et son silence
+          ne vaut pas « tout va bien ». Vérifier le tailnet, puis l'IPv4 de
+          patator-standby — ce nœud l'a perdue quatre fois en trois semaines
+          (.agent/DISCOVERY.md).
+        success_msg: "{{ atteints | length }} hôte(s) réellement touché(s)"
+        quiet: true
+
+    - name: Rappeler ce que ce playbook n'a PAS fait
+      ansible.builtin.debug:
+        msg:
+          - "Les agents sont POSÉS, pas armés — c'est l'état voulu."
+          - "Armement : geste d'exploitation, par runbook, par un humain (RULES § 1)."
+          - "Le tableau d'armement de .agent/ACTIVE.md reste la seule source de « ce qui tourne »."

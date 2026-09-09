@@ -1,0 +1,44 @@
+---
+# Armement de l'agent — geste humain uniquement (`RULES` § 1).
+
+- name: Lire le témoin de désarmement d'urgence
+  ansible.builtin.stat:
+    path: "{{ sentinel_disarm_file }}"
+  register: sentinel_agent_temoin_desarmement
+  become: true
+  failed_when: false
+  changed_when: false
+
+- name: Refuser d'armer si le témoin est présent, ou si on n'a pas pu le lire
+  ansible.builtin.fail:
+    msg: >-
+      {{
+        "ARMEMENT REFUSÉ : le témoin de désarmement " ~ sentinel_disarm_file
+        ~ " est PRÉSENT. Quelqu'un l'a posé ; il se retire par le même geste, "
+        ~ "à la main, jamais par un playbook."
+        if ('stat' in sentinel_agent_temoin_desarmement
+            and sentinel_agent_temoin_desarmement.stat.exists)
+        else
+        "ARMEMENT REFUSÉ : le témoin de désarmement " ~ sentinel_disarm_file
+        ~ " n'a pas pu être LU. État inconnu — on n'arme pas sur une mesure "
+        ~ "qu'on n'a pas pu prendre (.agent/RULES.md § 1)."
+      }}
+  when: >-
+    'stat' not in sentinel_agent_temoin_desarmement
+    or sentinel_agent_temoin_desarmement.stat.exists
+
+- name: Activer et démarrer l'agent
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_agent_unite }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Consigner que l'agent a été armé
+  ansible.builtin.debug:
+    msg: >-
+      ARMÉ : {{ sentinel_agent_unite }} sur {{ inventory_hostname }}, manager
+      {{ sentinel_agent_server_host }}. Mode tournoi lu :
+      {{ sentinel_agent_mode_tournoi }}. AUCUNE réponse automatique n'est armée.
+      Mettre à jour le tableau d'armement de .agent/ACTIVE.md.

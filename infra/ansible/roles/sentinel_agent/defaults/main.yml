@@ -1,0 +1,34 @@
+---
+# Rôle `sentinel_agent` — agent Wazuh sur les nœuds Linux du parc.
+# Décidé par ADR-001 (moteur) ; enrôlé auprès du serveur central de P01.0.
+#
+# Tout ce qui est ici se surcharge. Les invariants sont dans `vars/main.yml`.
+
+# --- La garde d'armement ----------------------------------------------------
+# `false`, et cette valeur NE CHANGE JAMAIS dans le dépôt (`RULES` § 1).
+# Désarmé : paquet posé, configuration rendue, enrôlement fait — mais l'unité
+# n'est NI activée NI démarrée.
+#
+# Armer : ansible-playbook playbooks/02_agent.yml -e '{"sentinel_agent_enabled": true}'
+sentinel_agent_enabled: false
+
+# --- Version et dépôt — UNE SEULE SOURCE ------------------------------------
+# Manager et agents partagent la version majeure. L'épingle vit UNIQUEMENT dans
+# `roles/sentinel_server/defaults/main.yml` (`sentinel_server_wazuh_version`,
+# actuellement `4.14.7` — arbitrage PO `P01.10` issue B). Même logique pour la
+# clé de dépôt (`sentinel_server_repo_key_*`) : confirmée en `A2`, pas recopiée
+# ici. Le playbook `02_agent.yml` charge ces defaults avant le rôle ; ce fichier
+# ne pose PAS de seconde épingle.
+
+# --- Le `.env` de la machine ------------------------------------------------
+# `SENTINEL_ENROLL_KEY` et `SENTINEL_SERVER_HOST` y vivent — jamais ici.
+sentinel_agent_env_file: "{{ sentinel_install_dir }}/.env"
+
+# --- Propriété des fichiers posés -------------------------------------------
+sentinel_agent_owner: "root"
+sentinel_agent_group: "wazuh"
+sentinel_agent_config_mode: "0640"
+
+# --- Désinstallation --------------------------------------------------------
+sentinel_agent_desinstaller: false
+sentinel_agent_purger_etat: false

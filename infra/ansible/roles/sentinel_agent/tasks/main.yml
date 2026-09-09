@@ -1,0 +1,41 @@
+---
+# Orchestration du rôle `sentinel_agent` (roles/GABARIT.md § 1).
+
+- name: Désinstallation — geste explicite, jamais le défaut
+  ansible.builtin.include_tasks: 99_desinstallation.yml
+  when: sentinel_agent_desinstaller | bool
+  tags:
+    - sentinel_agent
+    - sentinel_agent_desinstallation
+
+- name: Préconditions — ce qui doit être vrai avant de poser quoi que ce soit
+  ansible.builtin.include_tasks: 00_garde.yml
+  when: not (sentinel_agent_desinstaller | bool)
+  tags:
+    - sentinel_agent
+    - sentinel_agent_garde
+    - always
+
+- name: Pose — dépôt, paquet épinglé, configuration, enrôlement ; rien n'est démarré
+  ansible.builtin.include_tasks: 10_pose.yml
+  when: not (sentinel_agent_desinstaller | bool)
+  tags:
+    - sentinel_agent
+    - sentinel_agent_pose
+
+- name: Armement — uniquement sur geste explicite d'un humain
+  ansible.builtin.include_tasks: 20_armement.yml
+  when:
+    - not (sentinel_agent_desinstaller | bool)
+    - sentinel_agent_enabled | bool
+  tags:
+    - sentinel_agent
+    - sentinel_agent_armement
+
+- name: Bilan — y compris ce qui a été signalé sans être joué
+  ansible.builtin.include_tasks: 90_bilan.yml
+  when: not (sentinel_agent_desinstaller | bool)
+  tags:
+    - sentinel_agent
+    - sentinel_agent_bilan
+    - always

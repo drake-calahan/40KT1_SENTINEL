@@ -1,0 +1,55 @@
+---
+# Désinstallation de l'agent — réversibilité jouable (ADR-001).
+
+- name: Arrêter et désactiver l'agent
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_agent_unite }}"
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false
+
+- name: Lever le gel de version
+  ansible.builtin.dpkg_selections:
+    name: "{{ sentinel_agent_paquet }}"
+    selection: install
+  become: true
+  failed_when: false
+
+- name: Retirer le paquet de l'agent
+  ansible.builtin.apt:
+    name: "{{ sentinel_agent_paquet }}"
+    state: absent
+    purge: "{{ sentinel_agent_purger_etat | bool }}"
+  become: true
+
+- name: Retirer l'épinglage de l'agent
+  ansible.builtin.file:
+    path: /etc/apt/preferences.d/sentinel-wazuh-agent.pref
+    state: absent
+  become: true
+
+- name: Recharger le gestionnaire de services
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+- name: Détruire l'état de l'agent (clés, journaux locaux)
+  ansible.builtin.file:
+    path: "{{ sentinel_agent_ossec_dir }}"
+    state: absent
+  become: true
+  when: sentinel_agent_purger_etat | bool
+
+- name: Bilan de désinstallation
+  ansible.builtin.debug:
+    msg:
+      - "hôte    : {{ inventory_hostname }}"
+      - "logiciel: retiré ({{ sentinel_agent_paquet }})"
+      - >-
+        état    : {{ 'DÉTRUIT — ' ~ sentinel_agent_ossec_dir ~ ' effacé'
+                     if sentinel_agent_purger_etat | bool
+                     else 'CONSERVÉ dans ' ~ sentinel_agent_ossec_dir
+                          ~ ' — le retirer est un geste séparé' }}
+      - "dépôt   : le dépôt wazuh partagé n'est retiré que si plus aucun rôle ne l'utilise"
+      - "ACTIVE.md : mettre à jour le tableau d'armement."

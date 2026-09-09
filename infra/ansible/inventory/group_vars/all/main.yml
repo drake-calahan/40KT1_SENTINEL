@@ -118,10 +118,16 @@ sentinel_fim_realtime_paths:
   - /etc
   - "{{ hq_stack_dir }}/.env"
   - "{{ ansible_facts['env']['HOME'] | default('/home/' ~ ansible_user) }}/.ssh/authorized_keys"
+  # P01.12 — cas critique F2 : clés SSH de root (règle 100101)
+  - /root/.ssh/authorized_keys
   - /etc/systemd/system
   - "{{ hq_stack_dir }}/docker-compose.yml"
   - "{{ hq_stack_dir }}/scripts"
   - /usr/bin/tailscale
+  # P01.11 — démon privilégié Tailscale (règle 100130 ne couvrait que le CLI)
+  - /usr/sbin/tailscaled
+  # P01.11 — binaire sudo Ubuntu 26.04 (règle 100131)
+  - /usr/bin/sudo.ws
 
 # Balayage complet, cadence lente (D2).
 sentinel_fim_scan_interval: "12h"

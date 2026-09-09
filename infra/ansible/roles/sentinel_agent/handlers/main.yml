@@ -1,0 +1,28 @@
+---
+# Handlers du rôle `sentinel_agent`.
+#
+# Exception nommée `wazuh-agent.service` — même forme que sentinel_server
+# (roles/GABARIT.md § 3) : affirmation EN PREMIER, refus avant redémarrage.
+
+- name: Refuser de redémarrer une unité qui n'est pas à nous
+  ansible.builtin.assert:
+    that:
+      - item in sentinel_agent_unites_autorisees
+    fail_msg: >-
+      REFUS : « {{ item }} » n'est pas dans les unités que ce rôle a le droit de
+      redémarrer ({{ sentinel_agent_unites_autorisees | join(', ') }}). Les
+      unités de 40KT1_HQ ({{ sentinel_agent_unites_de_hq | join(', ') }}) se
+      LISENT. `patator-tower` sert hq.40kt1.com : un redémarrage de trop pendant
+      la pose d'un outil de sécurité dégrade le parc. Voir .agent/RULES.md § 3.
+    quiet: true
+  loop: "{{ [sentinel_agent_unite] }}"
+  listen: redemarrer l agent
+
+- name: Redémarrer l'agent
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_agent_unite }}"
+    state: restarted
+    daemon_reload: true
+  become: true
+  when: sentinel_agent_enabled | bool
+  listen: redemarrer l agent
