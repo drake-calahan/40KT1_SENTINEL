@@ -115,7 +115,7 @@ partie, toujours.**
 > livraison : les deux lots sont conformes à leur brief. Ce sont des **trous
 > dans les briefs**, et ils se referment ici plutôt que dans une discussion.
 
-- [~] **P00.11** (cursor, 2026-09-09) Garde `garde-armement` : élargir aux formes booléennes
+- [x] **P00.11** (cursor, 2026-09-09) Garde `garde-armement` : élargir aux formes booléennes
       **équivalentes**. Le motif actuel ne reconnaît que `true` / `false`
       littéraux. Mesuré le 2026-09-09 sur `5ce90c0` : les quatre lignes
       `sentinel_response_enabled: yes`, `sentinel_agent_enabled: True`,
