@@ -1,0 +1,79 @@
+<!--
+  P01.2 — /etc générique et unités systemd (liste courte D1).
+  Chemins surveillés : voir sentinel_fim_realtime_paths dans group_vars/all/main.yml.
+  Les exclusions (level 0) sont des ENFANTS des règles d'alerte : en Wazuh, un
+  level 0 frère de 550 ne coupe pas l'alerte sœur — seul un enfant remplace le parent.
+-->
+<group name="syscheck,sentinel,integrite,systeme,">
+
+  <!--
+    Attrape toute modification d'une unité ou d'un timer systemd posé sous system/.
+    Un déploiement Sentinel ou HQ qui dépose une nouvelle unité 40kt1-* légitimement peut déclencher à tort.
+  -->
+  <rule id="100111" level="8">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">^/etc/systemd/system/</field>
+    <description>Intégrité (orange) : unité ou timer systemd modifié</description>
+  </rule>
+
+  <!--
+    Exclusion : liens symboliques .wants/ créés par systemctl enable lors d'un déploiement.
+    Motif : activer une unité 40kt1-* recâble des symlinks sans changer le contenu de l'unité elle-même.
+  -->
+  <rule id="100151" level="0">
+    <if_sid>100111</if_sid>
+    <field name="file" type="pcre2">\.wants/</field>
+    <description>Exclusion : symlinks systemd .wants/ (déploiement systemctl enable)</description>
+  </rule>
+
+  <!--
+    Attrape toute modification d'un fichier sous /etc hors unités systemd (règle 100111).
+    Une mise à jour de paquet système (motd, timezone) peut encore déclencher à tort.
+  -->
+  <rule id="100110" level="8">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">^/etc/(?!systemd/system/)</field>
+    <description>Intégrité (orange) : fichier de configuration système modifié sous /etc</description>
+  </rule>
+
+  <!--
+    Exclusion : artefacts temporaires dpkg créés par apt/unattended-upgrades sous /etc.
+    Motif : chaque mise à jour nocturne laisse des suffixes .dpkg-old, .dpkg-new ou .dpkg-dist.
+  -->
+  <rule id="100150" level="0">
+    <if_sid>100110</if_sid>
+    <field name="file" type="pcre2">\.dpkg-(old|new|dist|tmp)$</field>
+    <description>Exclusion : artefacts dpkg sous /etc (unattended-upgrades)</description>
+  </rule>
+
+  <!--
+    Exclusion : fichiers temporaires d'éditeur laissés sous /etc pendant une session root.
+    Motif : vim/nano laissent des .swp ou .save lors d'une édition manuelle interrompue.
+  -->
+  <rule id="100152" level="0">
+    <if_sid>100110</if_sid>
+    <field name="file" type="pcre2">\.(swp|tmp|save|bak~)$</field>
+    <description>Exclusion : fichiers temporaires d'éditeur sous /etc</description>
+  </rule>
+
+  <!--
+    Exclusion : magasin de certificats CA mis à jour par le paquet ca-certificates.
+    Motif : unattended-upgrades ou rotation CA touche /etc/ssl/certs/ sans changement de politique locale.
+  -->
+  <rule id="100153" level="0">
+    <if_sid>100110</if_sid>
+    <field name="file" type="pcre2">^/etc/ssl/certs/</field>
+    <description>Exclusion : magasin CA sous /etc/ssl/certs/ (unattended-upgrades)</description>
+  </rule>
+
+  <!--
+    Exclusion : statut logrotate sous /etc lors de la rotation nocturne des journaux.
+    Motif : logrotate réécrit son fichier d'état à chaque passage, sans signal de compromission.
+  -->
+  <rule id="100154" level="0">
+    <if_sid>100110</if_sid>
+    <field name="file" type="pcre2">^/etc/logrotate\.(status|status\.old)$</field>
+    <description>Exclusion : état logrotate sous /etc (rotation de journaux)</description>
+  </rule>
+
+</group>

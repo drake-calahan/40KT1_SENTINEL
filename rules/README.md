@@ -15,6 +15,34 @@ rules/
 └── agents/           santé des agents — dont l'anti-rafale du standby
 ```
 
+## Plages d'identifiants
+
+Les règles locales vivent au-dessus de `100000`. Une plage par famille — une règle
+nouvelle n'entre jamais en collision avec une autre famille écrite en parallèle :
+
+| Famille | Plage | Lot |
+|---|---|---|
+| `integrite/` | `100100`–`100199` | `P01.2` |
+| `authentification/` | `100200`–`100299` | `P01.8` |
+| `docker/` | `100300`–`100399` | `P01.8` |
+| `conformite/` | `100400`–`100499` | `P01.9` |
+| `agents/` | `100500`–`100599` | `P01.3` |
+
+## Sévérité ↔ niveau moteur
+
+Fixée en `P01.2`, documentée et câblée en `P02.1` — **ne pas la redéfinir ailleurs.**
+
+| Sévérité du dépôt | Niveau moteur | Ce que ça déclenchera en phase 2 |
+|---|---|---|
+| `info` | 3–5 | rien — retour au vert |
+| `orange` | 7–9 | Discord |
+| `rouge` | 10–12 | Discord + push |
+| `critique` | 13–15 | Discord + push, réservé aux **trois cas** de `F2` |
+
+Les trois cas `critique`, et **aucun autre** : modification d'`authorized_keys` ·
+connexion réussie depuis une source jamais vue · gel du budget de réponse.
+Dans le lot `P01.2`, seule la règle sur `authorized_keys` porte `critique`.
+
 ## Ce que chaque règle porte
 
 | Champ | Pourquoi |

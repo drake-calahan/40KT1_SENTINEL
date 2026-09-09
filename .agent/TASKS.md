@@ -183,7 +183,7 @@ partie, toujours.**
       puis trancher : rester sur un mineur qui s'en passe · produire `D4`
       autrement en lecture seule · rouvrir `ADR-001` sur le profil.
       **Bloque `P01.9`**, pas `P01.1`.
-- [ ] **P01.2** (cursor) Règles d'intégrité (`rules/integrite/`) sur la liste
+- [x] **P01.2** (cursor, 2026-09-09) Règles d'intégrité (`rules/integrite/`) sur la liste
       courte de `D1` — [brief](briefs/P01.2-regles-integrite.md). Fixe les plages
       d'identifiants et la correspondance sévérité ↔ niveau pour tous les lots de
       règles suivants.
