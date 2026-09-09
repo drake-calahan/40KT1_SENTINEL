@@ -161,17 +161,29 @@
       }}
   changed_when: false
 
+# Secret posé en fichier — jamais en argument. `no_log` masque la sortie
+# Ansible ; `/proc/<pid>/cmdline` ne ment pas. `agent-auth` lit authd.pass
+# tout seul quand le fichier existe (même motif que sentinel_server).
+- name: Poser le secret d'enrôlement (fichier, pas la ligne de commande)
+  ansible.builtin.copy:
+    content: "{{ sentinel_agent_enroll_key }}\n"
+    dest: "{{ sentinel_agent_authd_pass }}"
+    owner: "{{ sentinel_agent_owner }}"
+    group: "{{ sentinel_agent_group }}"
+    mode: "0640"
+  become: true
+  no_log: true
+  when: not sentinel_agent_deja_enrolle
+
 - name: Enrôler l'agent auprès du serveur central
   ansible.builtin.command:
     cmd: >-
       {{ sentinel_agent_ossec_dir }}/bin/agent-auth
       -m {{ sentinel_agent_server_host }}
       -p {{ sentinel_server_port_enrolement }}
-      -P {{ sentinel_agent_enroll_key }}
       -A {{ inventory_hostname }}
     creates: "{{ sentinel_agent_client_keys }}"
   become: true
-  no_log: true
   when:
     - not sentinel_agent_deja_enrolle
     - not ansible_check_mode

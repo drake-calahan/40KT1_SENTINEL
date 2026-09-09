@@ -20,7 +20,7 @@
   <client>
     <server>
       <address>{{ sentinel_agent_server_host }}</address>
-      <port>1514</port>
+      <port>{{ sentinel_server_port_evenements }}</port>
       <protocol>tcp</protocol>
     </server>
     <config-profile>ubuntu, ubuntu22, ubuntu22.04</config-profile>
@@ -64,6 +64,9 @@
     <run_on_start>yes</run_on_start>
   </wodle>
 
-  <!-- Aucun bloc <active-response> : ADR-002 § 6, cinq portes. -->
+  <!-- Sur un agent, l'omission vaut disabled=no. On l'écrit. ADR-002 § 6. -->
+  <active-response>
+    <disabled>yes</disabled>
+  </active-response>
 
 </ossec_config>
