@@ -24,9 +24,11 @@ central), `P01.4` (bornage + interlock), `P03.6` (les quatre gestes), `P03.1`
 (relais) et `P02.2` (moteur de bruit). **Aucun n'est coché** — ils attendent le
 vert de la CI sur la PR.
 
-**2026-09-09, revue de la PR #10** : `P01.2` (règles d'intégrité, `cursor`) est
-**acceptée sur le fond**, avec **trois corrections demandées avant fusion** et
-deux suites hors lot ouvertes (`P01.11`, `P01.12`, toutes deux dans `P01.1`).
+**2026-09-09, revue puis fusion des PR #10, #11 et #12** : `P01.2` (règles
+d'intégrité) est **fusionnée après trois corrections de revue**, et `P00.11`
+(garde `garde-armement`) est fusionnée **puis prolongée** à la classe booléenne
+complète — sept formes valides passaient encore au vert. Deux suites hors lot
+restent ouvertes (`P01.11`, `P01.12`), toutes deux à traiter dans `P01.1`.
 
 Ce qui part maintenant : **`P01.1`** (`cursor` — rôle `sentinel_agent`, débloqué
 par la fusion de `P01.6` et `P01.0` sur `main`, brief passé à **prêt**) ·

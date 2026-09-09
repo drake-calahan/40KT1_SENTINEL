@@ -1,0 +1,29 @@
+<!--
+  P01.2 — Binaires sensibles du parc (liste courte D1).
+  Chemins surveillés : voir sentinel_fim_realtime_paths dans group_vars/all/main.yml.
+-->
+<group name="syscheck,sentinel,integrite,binaires,">
+
+  <!--
+    Attrape toute modification du binaire tailscale sous /usr/bin/.
+    Une mise à jour manuelle de Tailscale (hors unattended-upgrades, liste noire) légitime peut déclencher à tort.
+  -->
+  <rule id="100130" level="11">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">^/usr/bin/tailscale$</field>
+    <description>Intégrité (rouge) : binaire tailscale modifié</description>
+  </rule>
+
+  <!--
+    Attrape toute modification du binaire sudo.ws (contournement sudo-rs pour Ansible sur Ubuntu 26.04).
+    Une mise à jour du paquet sudo ou un basculement vers sudo-rs peut déclencher à tort lors d'une montée de version.
+    ATTENTE P01.1 : ce chemin n'est pas encore dans sentinel_fim_realtime_paths — la règle
+    ne mesurera rien tant que l'agent ne surveille pas ce binaire (sinon faux vert silencieux).
+  -->
+  <rule id="100131" level="11">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">^/usr/bin/sudo\.ws$</field>
+    <description>Intégrité (rouge) : binaire sudo.ws modifié</description>
+  </rule>
+
+</group>

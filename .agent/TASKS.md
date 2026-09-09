@@ -60,17 +60,20 @@ partie, toujours.**
 >
 > **Aucun de ces six ne se coche avant le vert de la CI sur la PR.**
 >
-> **2026-09-09, troisième temps — la PR #10 de `cursor` est relue.**
-> `P01.2` (règles d'intégrité) est **acceptée sur le fond** — structure des
-> règles juste, exclusions écrites en enfants Wazuh et non en frères de `550`,
-> les sept critères du brief vérifiés. **Trois corrections sont demandées avant
-> fusion**, toutes sur la PR : `100110` avale `/etc/ssh/` et `/etc/sudoers` (la
-> sévérité d'un événement `sshd_config` dépendrait alors de l'ordre
-> d'inclusion, écrit dans un autre lot) · l'exclusion `100154` vise
-> `/etc/logrotate.status`, qui n'existe pas sur Ubuntu — exclusion morte ·
-> `100150` manque les artefacts `ucf`, qui sont le bruit dominant
-> d'`unattended-upgrades` sous `/etc`. Deux suites **hors lot** sont ouvertes
-> ci-dessus (`P01.11`, `P01.12`) : elles appartiennent à `P01.1`.
+> **2026-09-09, troisième temps — les PR #10, #11 et #12 sont fusionnées.**
+> `P01.2` (règles d'intégrité) a été relue, **trois corrections demandées**,
+> **rendues par `cursor` et fusionnées** (détail sur la ligne `P01.2`). Deux
+> suites **hors lot** restent ouvertes ci-dessus (`P01.11`, `P01.12`) : elles
+> appartiennent à `P01.1`, parce que ce qui manque est dans
+> `sentinel_fim_realtime_paths` et non dans `rules/`.
+>
+> `P00.11` (garde `garde-armement`) est fusionnée elle aussi, **et prolongée** :
+> le motif livré bloquait bien les quatre cas du brief `P00.8`, mais sept formes
+> tout aussi valides passaient encore — `TRUE`, `YES`, `ON`, `y`, `1` côté
+> armement, `OFF` et `0` côté `dry_run`. La garde matche désormais la **classe**
+> booléenne (YAML 1.1, toutes casses, formes courtes) plutôt qu'une liste
+> d'orthographes, et une borne de fin de valeur supprime au passage un faux
+> positif (`enabled: yesterday_placeholder`). Mesuré dans les deux sens.
 >
 > **La suite, en parallèle** :
 > - `cursor` → **`P01.1`** (rôle `sentinel_agent`). **Débloqué et délégué le
@@ -130,7 +133,7 @@ partie, toujours.**
 > livraison : les deux lots sont conformes à leur brief. Ce sont des **trous
 > dans les briefs**, et ils se referment ici plutôt que dans une discussion.
 
-- [ ] **P00.11** (cursor) Garde `garde-armement` : élargir aux formes booléennes
+- [x] **P00.11** (cursor, 2026-09-09) Garde `garde-armement` : élargir aux formes booléennes
       **équivalentes**. Le motif actuel ne reconnaît que `true` / `false`
       littéraux. Mesuré le 2026-09-09 sur `5ce90c0` : les quatre lignes
       `sentinel_response_enabled: yes`, `sentinel_agent_enabled: True`,
@@ -141,6 +144,14 @@ partie, toujours.**
       `defaults` »), et il passe. Étendre le motif à
       `true|yes|on|True|Yes|On` (et `false|no|off|…` pour `dry_run`), guillemets
       optionnels, puis **rejouer les quatre cas d'acceptation du brief `P00.8`**.
+      **Fait et fusionné (PR #11), puis prolongé en revue (PR #12)** : le motif
+      livré bloquait les quatre cas du brief mais laissait passer `TRUE`, `YES`,
+      `ON`, `y`, `1` et, côté `dry_run`, `OFF` et `0` — mesuré. La garde matche
+      désormais la **classe** booléenne (`grep -i`, formes courtes) et non une
+      liste d'orthographes, sans quoi la prochaine variante rouvre le trou. Une
+      borne de fin de valeur a été ajoutée : elle supprime un faux positif
+      antérieur (`sentinel_desc_enabled: yesterday_placeholder` déclenchait), et
+      une garde qui crie à tort finit désarmée.
       *Le gabarit `P01.6` impose déjà `false` littéral côté rôle ; cette garde
       est la ceinture, pas les bretelles.*
 - [ ] **P00.12** (PO) Rendre `garde-armement` **obligatoire** dans le ruleset
@@ -233,10 +244,16 @@ partie, toujours.**
       *Une exigence en est déjà sortie et ne dépend d'aucun arbitrage : le
       rapport `D4` doit distinguer « aucune vulnérabilité » de « aucune donnée »
       — portée dans le brief `P01.9`.*
-- [ ] **P01.2** (cursor) Règles d'intégrité (`rules/integrite/`) sur la liste
+- [x] **P01.2** (cursor, 2026-09-09) Règles d'intégrité (`rules/integrite/`) sur la liste
       courte de `D1` — [brief](briefs/P01.2-regles-integrite.md). Fixe les plages
       d'identifiants et la correspondance sévérité ↔ niveau pour tous les lots de
-      règles suivants.
+      règles suivants. **Fusionné (PR #10) après les trois corrections de
+      revue** : `100110` ne recouvre plus `/etc/ssh/` ni `/etc/sudoers` (la
+      précédence est écrite dans la règle, plus dans l'ordre d'inclusion) ·
+      `100154` visait `/etc/logrotate.status`, qui n'existe pas sur Ubuntu, et
+      vise désormais `/etc/logrotate.d/` · `100150` couvre les artefacts `ucf`.
+      Les motifs d'exclusion trop larges (`.tmp`, `.cache`) ont été resserrés
+      sur les artefacts réels.
 - [ ] **P01.1** (cursor) Rôle `sentinel_agent` — agents sur `patator-tower` et
       `patator-standby`, enrôlement par clé, aucun redémarrage de service de
       production déclenché par le rôle —
