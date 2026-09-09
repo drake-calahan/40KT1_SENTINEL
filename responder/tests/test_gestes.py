@@ -220,6 +220,43 @@ def test_arreter_conteneur_ne_se_contourne_pas_par_la_casse_ou_un_slash(nom: str
         arreter_conteneur.valider(nom)
 
 
+@pytest.mark.parametrize(
+    "nom",
+    [
+        "fortyk-db-1",
+        "fortyk-caddy-1",
+        "fortyk-api-1",
+        "fortyk-cloudflared-1",
+        # Compose numérote ses instances : `-2` le jour où l'on met à l'échelle.
+        "fortyk-db-2",
+        # Un refus qu'on contourne par une majuscule ou un slash ne protège de rien.
+        "/fortyk-API-1",
+    ],
+)
+def test_arreter_conteneur_refuse_les_noms_reels_du_parc(nom: str) -> None:
+    """Les vrais noms, relevés par `docker ps` sur `patator-tower` le 2026-09-09.
+
+    Le lot `P03.7` demandait de confirmer que la liste couvrait les noms réels.
+    Elle ne les couvrait pas : le projet Compose s'appelle `fortyk`, pas
+    `40kt1`, et les quatre conteneurs protégés étaient tous arrêtables sous leur
+    vrai nom. La protection était écrite, relue, testée — et vide. Ce test est
+    celui qui manquait, et il ne peut être écrit qu'après avoir regardé la
+    machine.
+    """
+    with pytest.raises(CibleRefusee):
+        arreter_conteneur.valider(nom)
+
+
+def test_arreter_conteneur_laisse_le_scraper_arretable() -> None:
+    """`fortyk-scraper-1` n'est **pas** protégé, et c'est délibéré.
+
+    Il ne sert ni la donnée, ni le nom public, ni la version servie. Un scraper
+    compromis est exactement ce qu'on veut pouvoir arrêter — protéger tout le
+    projet Compose d'un bloc aurait vidé le geste de son objet.
+    """
+    assert arreter_conteneur.valider("fortyk-scraper-1") == "fortyk-scraper-1"
+
+
 def test_arreter_conteneur_accepte_un_conteneur_quelconque() -> None:
     assert arreter_conteneur.valider("scraper-jetable") == "scraper-jetable"
 

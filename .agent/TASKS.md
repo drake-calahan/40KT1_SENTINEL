@@ -224,26 +224,20 @@ partie, toujours.**
       de la clé de dépôt (le rôle **refuse** de tourner tant que
       `sentinel_server_repo_key_confirmee` est `false`) et poser le `.env` avec
       `SENTINEL_ENROLL_KEY`. Voir le [README du rôle](../infra/ansible/roles/sentinel_server/README.md).
-- [~] **P01.10** (**relevé fait** — claude, 2026-09-09 · **l'arbitrage reste au
-      PO**) **`D4` et le mineur du moteur.** Relevé :
+- [x] **P01.10** (relevé claude · **tranché PO**, 2026-09-09) **`D4` et le
+      mineur du moteur.** Relevé :
       [`docs/releves/P01.10`](../docs/releves/P01.10-mineur-du-moteur-et-D4.md).
-      **La coupure est à `4.8.0`** (12 juin 2024) : avant, les résultats de
-      vulnérabilités vivent dans une base **locale** du manager et l'API du
-      manager sait les lire ; à partir de `4.8.0`, ils sont poussés vers
-      l'**indexeur** — que le profil frugal n'installe pas (`ADR-001`) — et les
-      points de sortie `/vulnerability` de l'API du manager sont **supprimés**.
-      Notre épingle est `4.7.5`, donc **`D4` est productible sans indexeur** et
-      `ADR-001` tient. **Le coût est ailleurs** : `4.7.5` est de 2024, la branche
-      courante est `4.14.7` (29 juillet 2026) — rester dessus, c'est poser sur
-      deux machines de production un composant privilégié figé à ~2 ans de
-      correctifs. Trois issues chiffrées au relevé § 6 (rester pré-`4.8` ·
-      monter et produire `D4` autrement · rouvrir `ADR-001`).
-      **Aucune valeur n'a été changée** : `sentinel_server_wazuh_version` reste
-      `4.7.5` — la changer avant l'arbitrage serait trancher en douce.
-      **Bloque `P01.9`**, pas `P01.1` ni `P01.2` ni `P01.8`.
-      *Une exigence en est déjà sortie et ne dépend d'aucun arbitrage : le
-      rapport `D4` doit distinguer « aucune vulnérabilité » de « aucune donnée »
-      — portée dans le brief `P01.9`.*
+      La coupure est à `4.8.0` : avant, les résultats vivent dans une base
+      **locale** du manager ; après, ils partent vers l'**indexeur** que le
+      profil frugal n'installe pas, et les points de sortie `/vulnerability` de
+      l'API du manager sont supprimés. **Issue B retenue** : on monte sur la
+      branche courante, `D4` se produira autrement —
+      `sentinel_server_wazuh_version` passe de `4.7.5` à **`4.14.7`** (la plus
+      récente servie par le dépôt, relevée dans l'index apt). Motif : rester en
+      `4.7.5` figeait un composant privilégié à ~2 ans de correctifs sur deux
+      machines de production, pour ne gagner que la source du rapport le moins
+      critique des quatre. **Ne débloque pas `P01.9` pour autant** — voir
+      `P01.14`.
 - [x] **P01.2** (cursor, 2026-09-09) Règles d'intégrité (`rules/integrite/`) sur la liste
       courte de `D1` — [brief](briefs/P01.2-regles-integrite.md). Fixe les plages
       d'identifiants et la correspondance sévérité ↔ niveau pour tous les lots de
@@ -294,6 +288,40 @@ partie, toujours.**
 **Critère de sortie** : moins de 3 alertes non pertinentes par semaine, deux
 semaines de suite. Chiffré, mesuré, écrit — pas « ça a l'air calme ».
 
+## Suites des arbitrages du 2026-09-09
+
+> Trois lignes ouvertes en exécutant les décisions `A1`–`A3` et `P03.7`. Les
+> deux premières sont des questions ; la troisième est une mesure qui ne peut
+> se prendre que sur une machine.
+
+- [ ] **P01.13** (PO — arbitrage · claude — mise en œuvre) **Que veut dire
+      « la relève s'arme » ?** Le chemin est relevé (`A3`, 2026-09-09), le sens
+      ne l'est pas. `scripts/failover.py` de HQ ne persiste que deux états :
+      `node-state/tournament-mode` (présence = booléen, et c'est **lui** qui
+      arme la bascule automatique) et `backups/failover-state.json` (historique,
+      **présent en permanence** dès le premier passage). Le fichier
+      `node-state/failover-armed` que ce dépôt supposait **n'existe pas**.
+      Deux lectures possibles de `C3` : **(a)** la bascule est *armée* — c'est
+      le mécanisme qui existe, mais le standby sert peut-être encore
+      normalement et la RAM n'est pas sous pression ; **(b)** la bascule a *eu
+      lieu* — c'est le motif d'`ADR-003`, qui est la mémoire. (b) demande de
+      **parser un JSON**, pas de constater une présence : ce n'est plus le même
+      interlock. `hq_failover_state_file` suit (a) en attendant, et **vaut donc
+      exactement `hq_tournament_mode_file`** — deux variables pour un fichier,
+      ce qui est le signal qu'il manque quelque chose côté HQ.
+      `hq_failover_state_confirme` **reste `false`** : le chemin est relevé, le
+      sens n'est pas tranché, et c'est le sens qui commande.
+- [ ] **P01.14** (claude — mesure) **Où `D4` prend sa source en profil frugal
+      sur `4.14.x`.** Non tranché par la documentation : l'éditeur dit que le
+      module pousse vers l'indexeur, et dit aussi que son rapport part vers
+      `analysisd` — ce qui laisserait des alertes dans `alerts.json` sans
+      indexeur ; un fil de la communauté rapporte au contraire un refus
+      d'initialisation quand aucun indexeur n'est joignable. Se mesure au
+      premier `--check --diff` puis à la pose : le module se charge-t-il ·
+      produit-il des alertes · sinon, `D4` se construit sur l'inventaire de
+      paquets du `syscollector` confronté à une source CVE en lecture seule.
+      **Bloque `P01.9`** — l'exigence « aucune donnée ≠ aucune vulnérabilité »
+      est déjà dans son brief et n'attend, elle, aucune mesure.
 ## Phase 2 — Alerte
 
 - [ ] **P02.0** (cursor) Câblage `notify.sh` vers le salon Discord dédié et le
@@ -348,15 +376,21 @@ alerte réelle traitée de bout en bout.
       `100.64.0.0/10` — le tailnet — de la même façon selon la version de
       Python**. Le chemin d'administration du parc dépendait d'une mise à jour
       d'interpréteur. Plages désormais **nommées une par une**.
-- [ ] **P03.7** (PO) Confirmer la **liste des conteneurs non arrêtables**
-      (`responder/gestes/arreter_conteneur.py`). Motif : arrêter `cloudflared`
-      **est** `couper_connecteur`, classé *alerte* en nominal et *jamais* en
-      tournoi — l'autoriser rendrait exécutable un geste alerte-seulement en
-      changeant de nom de geste, et le catalogue fermé cesserait d'être fermé.
-      Même raisonnement pour `db` (la donnée), `caddy` (le nom public) et `api`
-      (la version servie), au titre de `RULES` § 2. **Rétrécir ne demande aucun
-      amendement** — c'est fait. Ce qu'il faut du PO, c'est confirmer que la
-      liste couvre bien les noms réels des conteneurs du parc.
+- [x] **P03.7** (PO — confirmation · claude — relevé et correctif, 2026-09-09)
+      Liste des conteneurs non arrêtables. **Elle ne protégeait rien.** Relevé
+      par `docker ps` sur `patator-tower` : les noms réels sont
+      `fortyk-caddy-1`, `fortyk-db-1`, `fortyk-api-1`, `fortyk-cloudflared-1`,
+      `fortyk-scraper-1` — le projet Compose s'appelle **`fortyk`**, pas
+      `40kt1`. Les entrées `40kt1-db` / `40kt1-caddy` / `40kt1-api` et les
+      formes nues ne correspondaient à **aucun** conteneur du parc : les quatre
+      protégés étaient tous arrêtables sous leur vrai nom. Les préfixes
+      `fortyk-*` sont ajoutés (le suffixe d'instance Compose `-1`, `-2` impose
+      de comparer le début, pas le nom entier) ; `fortyk-scraper-1` **reste
+      arrêtable**, délibérément. Rétrécir ne demande aucun amendement
+      (`RULES` § 2). 8 tests ajoutés.
+      *Ce que ce lot enseigne : les unités systemd de HQ portent bien `40kt1-`
+      (`40kt1-backup.service`). Les deux préfixes coexistent, et c'est ce qui
+      rendait l'erreur crédible à la relecture.*
 - [ ] **P03.8** (PO — arbitrage · claude — mise en œuvre) **Quarantaine et
       frontière HQ.** `quarantaine_fichier` refuse tout chemin sous `/srv/40kt1`
       ou `~/40KT1_HQ` : le contrat dit que Sentinelle les surveille **en

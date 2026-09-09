@@ -29,6 +29,25 @@ from responder.gestes.base import CibleRefusee, GesteEchoue, binaire, executer
 DELAI_ARRET = 10
 """Secondes laissées au conteneur pour s'arrêter proprement avant que Docker n'insiste."""
 
+# ── RELEVÉ SUR LA MACHINE, 2026-09-09 (lot P03.7) ──────────────────────────
+# Les noms réels de `patator-tower`, lus par `docker ps` :
+#
+#     fortyk-caddy-1   fortyk-db-1   fortyk-api-1
+#     fortyk-cloudflared-1           fortyk-scraper-1
+#
+# Le projet Compose s'appelle `fortyk`, PAS `40kt1`. La liste précédente
+# nommait `40kt1-db`, `40kt1-caddy`, `40kt1-api` et les formes nues `db`,
+# `caddy`, `api`, `cloudflared` : AUCUNE ne correspondait à un conteneur réel.
+# La protection existait, elle était correctement écrite, et elle ne
+# protégeait rien — c'est précisément ce que `P03.7` demandait de vérifier.
+#
+# Les unités systemd, elles, portent bien `40kt1-` (`40kt1-backup.service`) :
+# les deux préfixes coexistent sur la machine, et c'est ce qui rendait
+# l'erreur crédible.
+#
+# `fortyk-scraper-1` n'est PAS protégé, et c'est délibéré : le scraper ne sert
+# ni la donnée, ni le nom public, ni la version servie, et un scraper compromis
+# est justement ce qu'on veut pouvoir arrêter.
 CONTENEURS_PROTEGES: frozenset[str] = frozenset(
     {
         # L'arrêter EST `couper_connecteur`, classé alerte / jamais au catalogue.
@@ -46,7 +65,20 @@ CONTENEURS_PROTEGES: frozenset[str] = frozenset(
     }
 )
 
-PREFIXES_PROTEGES: tuple[str, ...] = ("40kt1-caddy", "40kt1-db", "40kt1-api")
+# Préfixes : Compose suffixe ses conteneurs d'un numéro d'instance
+# (`fortyk-db-1`, et `-2` le jour où l'on met à l'échelle). Comparer le nom
+# entier laisserait passer `fortyk-db-2`. On compare donc le début, et on
+# garde les formes `40kt1-*` : elles ne coûtent rien et couvrent un
+# renommage du projet Compose vers le nom du dépôt.
+PREFIXES_PROTEGES: tuple[str, ...] = (
+    "40kt1-caddy",
+    "40kt1-db",
+    "40kt1-api",
+    "fortyk-caddy",
+    "fortyk-db",
+    "fortyk-api",
+    "fortyk-cloudflared",
+)
 
 
 def valider(brut: str) -> str:

@@ -35,24 +35,41 @@ par la fusion de `P01.6` et `P01.0` sur `main`, brief passé à **prêt**) ·
 **porter le jumeau du contrat dans HQ** (`P00.5`, dernière moitié — dépôt
 tiers).
 
-**Six questions attendent le PO** — aucune ne bloque `cursor`, toutes bloquent
-un armement : `P00.11` et `P00.12` (la garde `garde-armement` ne voit pas
-`yes` / `on`, mesuré ; et elle n'est pas obligatoire à la fusion) · `P01.10`
-(le mineur du moteur décide de la source de `D4`, **bloque `P01.9`** — le
-**relevé est rendu** le 2026-09-09,
-[`docs/releves/P01.10`](../docs/releves/P01.10-mineur-du-moteur-et-D4.md) :
-la coupure est à `4.8.0`, notre épingle `4.7.5` produit `D4` sans indexeur mais
-gèle le moteur à ~2 ans de correctifs ; **trois issues chiffrées, l'arbitrage
-est au PO**) ·
-`P03.7` (liste des conteneurs non arrêtables) · `P03.8` (la quarantaine refuse
-l'arborescence de HQ, conformément au contrat — et c'est gênant) · `P03.9`
-(confirmer l'enveloppe de réponse active).
+**2026-09-09 — quatre arbitrages rendus par le PO** (`A1`–`A3`, `B`). Ce qui en
+sort :
 
-Deux prérequis sont posés **dans le code** et refusent de s'exécuter tant qu'ils
-ne sont pas levés : l'empreinte de la clé du dépôt de paquets
-(`sentinel_server_repo_key_confirmee`) et le chemin de l'état de la relève
-(`hq_failover_state_confirme`). Les deux se lèvent en relevant un fait, pas en
-décidant.
+- **`P01.10` tranché (issue B)** — `sentinel_server_wazuh_version` passe de
+  `4.7.5` à **`4.14.7`**. Rester sur la branche de 2024 aurait figé un composant
+  privilégié à ~2 ans de correctifs sur deux machines de production. Reste à
+  mesurer où `D4` prend sa source (`P01.14`, **bloque `P01.9`**).
+- **Empreinte de la clé du dépôt : CONFIRMÉE** sur deux infrastructures
+  distinctes (CDN de l'éditeur + `keys.openpgp.org`) —
+  `0DCFCA5547B19D2A6099506096B3EE5F29111145`, RSA 4096. Le rôle
+  `sentinel_server` ne refuse plus de tourner. ⚠️ **La clé expire le
+  2027-05-15**, avant quoi la revue d'`ADR-003` (2027-03-07) doit la reprendre.
+- **Chemin de l'état de la relève : relevé, et l'hypothèse était fausse.**
+  `node-state/failover-armed` **n'existe pas**. HQ ne persiste que
+  `node-state/tournament-mode` (présence = booléen) et
+  `backups/failover-state.json` (historique, toujours présent). Le sens de
+  « la relève s'arme » n'est **pas** tranché → `P01.13`.
+  `hq_failover_state_confirme` reste `false`.
+- **`P03.7` : la liste des conteneurs protégés ne protégeait rien.** Les noms
+  réels du parc sont `fortyk-*`, pas `40kt1-*` : les quatre conteneurs de
+  production étaient tous arrêtables sous leur vrai nom. Corrigé et testé.
+
+**Quatre questions attendent encore le PO** — aucune ne bloque `cursor`, toutes
+bloquent un armement : `P00.12` (la garde `garde-armement` n'est **pas
+obligatoire** à la fusion — un contrôle qui échoue sans bloquer est un avis) ·
+`P01.13` (que veut dire « la relève s'arme » — le chemin est relevé, le sens ne
+l'est pas ; bloque l'armement de l'interlock `P01.4`) · `P03.8` (la quarantaine
+refuse l'arborescence de HQ, conformément au contrat — et c'est gênant) ·
+`P03.9` (confirmer l'enveloppe de réponse active).
+
+**Un seul prérequis reste posé dans le code** : le chemin de l'état de la
+relève (`hq_failover_state_confirme`), et il n'attend plus un fait mais un
+**sens** — voir `P01.13`. L'autre, l'empreinte de la clé du dépôt de paquets
+(`sentinel_server_repo_key_confirmee`), est **levée** : relevée le 2026-09-09
+sur deux infrastructures distinctes.
 
 **Le lancement est cadré** : découpage en lots, affectation et ordre des vagues
 dans [`docs/plans/P02`](../docs/plans/P02-lancement-implementation.md) ; briefs
@@ -82,7 +99,7 @@ documenté par un runbook.
 |---|---|---|
 | Agent sur `patator-tower` | absent | `P1` |
 | Agent sur `patator-standby` | absent | `P1` |
-| Serveur central | absent | `P1` — hôte **tranché** : `patator-standby` frugal |
+| Serveur central | absent | `P1` — hôte **tranché** : `patator-standby` frugal, moteur `4.14.7` (`P01.10`) |
 | Alerte Discord + push | non câblée | `P2` |
 | Réponse à blanc | non — noyau **et** quatre gestes écrits, relais écrit ; **rien n'est installé sur une machine**, `SENTINEL_RESPONSE_ENABLED` reste `false` | `P3` |
 | Réponse armée | non | `P3` |
