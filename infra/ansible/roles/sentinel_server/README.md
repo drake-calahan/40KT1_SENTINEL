@@ -84,32 +84,51 @@ les deux cas, un faux vert.
 La valeur ne passe **ni** par le dépôt, **ni** par l'inventaire, **ni** par un
 `-e`. Modèle : [`.env.example`](../../../../.env.example).
 
-## La question ouverte — à trancher avant `P01.9`
+## Le mineur et `D4` — tranché le 2026-09-09
 
-**Le mineur retenu (`4.7.5`) n'est pas un détail pour `D4`** (inventaire de
-vulnérabilités, rapport hebdomadaire — lot `P01.9`, `cursor`).
+**Le choix du mineur n'était pas neutre pour `D4`** (inventaire de
+vulnérabilités, rapport hebdomadaire — lot `P01.9`). Il est **tranché**.
 
-Wazuh a redessiné son détecteur de vulnérabilités au cours de la série 4.x, et
-la version redessinée **stocke ses résultats dans l'indexeur** — que le profil
-frugal n'installe pas (`ADR-001`). Selon le mineur choisi, `D4` est donc soit
-disponible localement, soit à produire autrement.
+Le fait, relevé sur la documentation de l'éditeur : la coupure est à **`4.8.0`**
+(12 juin 2024). Avant, les résultats de vulnérabilités vivent dans une base
+SQLite **locale** du manager et l'API du manager sait les lire. À partir de
+`4.8.0`, ils sont poussés vers l'**indexeur** — que le profil frugal n'installe
+pas (`ADR-001`) — et les points de sortie `/vulnerability` de l'API du manager
+sont **supprimés**.
 
-**Ce point n'est pas vérifié.** Il est écrit ici parce qu'il se découvre au
-mauvais moment sinon : au milieu de `P01.9`, avec le moteur déjà posé sur une
-machine de production et la version gelée.
+**Décision du PO (`P01.10`, issue B)** : monter sur la branche courante et
+produire `D4` autrement. Le motif est que rester en `4.7.5` aurait posé sur deux
+machines de production un composant privilégié figé à ~2 ans de correctifs —
+pour ne gagner que la source du rapport le **moins** critique des quatre besoins
+de détection. `D1`, `D2` et `D3` sont indifférents au mineur.
 
-Ce qu'il faut faire, dans cet ordre :
+La version est donc `4.14.7`, la plus récente servie par le dépôt de l'éditeur
+au 2026-09-09.
 
-1. **relever** le comportement réel du mineur candidat (documentation de
-   l'éditeur, notes de version) — c'est un fait à constater, pas à supposer ;
-2. si `D4` exige l'indexeur, **choisir** entre : rester sur un mineur qui s'en
-   passe, produire l'inventaire par un autre moyen en lecture seule, ou rouvrir
-   `ADR-001` sur le profil. Les trois sont défendables ; aucune ne se décide
-   dans un rôle Ansible ;
-3. **consigner** le choix — et si le profil bouge, c'est un amendement
-   d'`ADR-001`, pas une variable qu'on change.
+### Ce qui reste à mesurer, et qui ne peut l'être que sur machine
 
-Tâche ouverte : `P01.10` dans [`TASKS.md`](../../../../.agent/TASKS.md).
+**Où `D4` prendra sa source en profil frugal sur `4.14.x` n'est pas établi.**
+La documentation dit que le module pousse ses résultats vers l'indexeur ; elle
+dit aussi que le rapport de détection est envoyé au moteur d'analyse
+(`analysisd`), ce qui laisserait des **alertes dans `alerts.json`** même sans
+indexeur. Les deux peuvent être vrais, et un fil de la communauté rapporte que
+le module refuse de s'initialiser quand aucun indexeur n'est joignable.
+
+**Ce n'est donc pas tranché par la documentation.** La mesure se prend au
+premier `--check --diff` puis à la pose, dans cet ordre :
+
+1. le module se charge-t-il sans indexeur, ou refuse-t-il de démarrer ?
+2. produit-il des alertes dans `alerts.json` ?
+3. si non : `D4` se produit à partir de l'inventaire de paquets du
+   `syscollector` (local, lisible) confronté à une source CVE en lecture seule.
+
+**Exigence qui ne dépend d'aucune de ces réponses**, et qui est déjà portée dans
+le brief `P01.9` : le rapport doit **distinguer « aucune vulnérabilité » de
+« aucune donnée »** et sortir en `unknown` bruyant dans le second cas. Un
+rapport vide qui ressemble à « rien à signaler » est le faux vert que ce dépôt
+existe pour empêcher.
+
+Relevé complet : [`docs/releves/P01.10`](../../../../docs/releves/P01.10-mineur-du-moteur-et-D4.md).
 
 ## Désinstallation — la réversibilité, jouable
 

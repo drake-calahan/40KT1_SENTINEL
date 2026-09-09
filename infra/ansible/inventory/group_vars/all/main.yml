@@ -52,19 +52,55 @@ hq_notify_script: "{{ hq_stack_dir }}/scripts/notify.sh"
 # l'arme, ne le désarme et ne le retarde jamais (docs/contrat-hq.md).
 #
 # ⚠️ CHEMIN NON CONFIRMÉ. Le contrat de frontière nomme l'objet — « l'état de la
-# relève (armée / au repos) » — mais pas le fichier qui le porte : ce mécanisme
-# vit dans `scripts/failover.py` et `ADR-061`, côté HQ. La valeur ci-dessous est
-# une HYPOTHÈSE, calquée sur le témoin de mode tournoi qui vit dans le même
-# répertoire.
+# relève (armée / au repos) » — mais pas le fichier qui le porte.
+#
+# ── RELEVÉ DANS `40KT1_HQ` LE 2026-09-09 (arbitrage `A3` du PO) ────────────
+# L'hypothèse précédente (`node-state/failover-armed`) était fausse : **ce
+# fichier n'existe pas**, ni dans le dépôt HQ ni sur `patator-tower`.
+# `scripts/failover.py` ne connaît que deux états persistés :
+#
+#   node-state/tournament-mode        présence = booléen. C'est CE drapeau qui
+#                                     arme la bascule automatique : sans lui,
+#                                     `evaluate()` rend « la bascule
+#                                     automatique n'est pas armée ».
+#   backups/failover-state.json       JSON d'historique : `failovers`,
+#                                     `peer_down_since`, `last_failover_reason`.
+#                                     Écrit à CHAQUE passage, donc présent en
+#                                     permanence dès le premier run.
+#
+# Conséquence : le modèle de l'interlock — « le fichier témoin existe donc la
+# relève est armée » — **ne s'applique pas** à `failover-state.json`, dont la
+# présence ne veut rien dire. Il s'applique à `tournament-mode`.
+#
+# ⚠️ ET C'EST LÀ QU'UNE DÉCISION MANQUE, pas une mesure. « La relève s'arme »
+# peut vouloir dire deux choses différentes :
+#   (a) la bascule est ARMÉE (tournament-mode posé) — mais le standby sert
+#       peut-être encore normalement, et la RAM n'est pas sous pression ;
+#   (b) la bascule a EU LIEU (le standby sert la production) — c'est le cas
+#       qui justifie `C3`, puisque le motif d'`ADR-003` est la mémoire.
+# (b) correspond au motif ; (a) correspond au mécanisme déjà écrit. Lire (b)
+# demande de PARSER un JSON, pas de constater une présence : ce n'est plus le
+# même interlock. Question ouverte `P01.13`.
 #
 # Tant que `hq_failover_state_confirme` vaut `false`, l'interlock de `P01.4` se
 # pose mais **refuse de s'armer** : un automate qui arrête le serveur de
 # sécurité en se fondant sur un chemin deviné est pire que pas d'interlock —
-# il s'arrêterait au hasard, ou jamais, sans qu'on sache lequel.
+# il s'arrêterait au hasard, ou jamais, sans qu'on sache lequel. Le drapeau
+# reste donc à `false` : le chemin est maintenant RELEVÉ, mais le sens de
+# « armée » n'est pas TRANCHÉ, et c'est le sens qui commande.
 #
-# À confirmer en portant le jumeau du contrat dans HQ (`P00.5`), et à consigner
-# des DEUX côtés : une frontière écrite d'un seul côté n'est pas une frontière.
-hq_failover_state_file: "{{ hq_stack_dir }}/node-state/failover-armed"
+# À consigner des DEUX côtés en portant le jumeau du contrat dans HQ (`P00.5`) :
+# une frontière écrite d'un seul côté n'est pas une frontière.
+#
+# La valeur ci-dessous suit l'issue (a) — le seul mécanisme qui existe
+# réellement aujourd'hui. Elle ne s'arme pas pour autant.
+#
+# NOTER qu'elle vaut alors EXACTEMENT `hq_tournament_mode_file` ci-dessus. Deux
+# variables pour un seul fichier, lu à deux fins différentes (moduler la
+# réponse en `E4` · arrêter le serveur central en `C3`), c'est un signal : ou
+# bien les deux besoins sont le même, ou bien `C3` visait (b) et il manque un
+# second signal côté HQ. À trancher en `P01.13`, pas ici.
+hq_failover_state_file: "{{ hq_stack_dir }}/node-state/tournament-mode"
 hq_failover_state_confirme: false
 
 # --- Bornage des ressources -------------------------------------------------
