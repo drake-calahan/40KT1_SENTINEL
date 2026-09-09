@@ -1,0 +1,100 @@
+---
+# Rôle `sentinel_server` — serveur central Wazuh, PROFIL FRUGAL.
+# Décidé par ADR-001 (moteur) et ADR-003 (hôte : patator-standby).
+#
+# Tout ce qui est ici se surcharge. Les invariants sont dans `vars/main.yml`.
+
+# --- La garde d'armement ----------------------------------------------------
+# `false`, et cette valeur NE CHANGE JAMAIS dans le dépôt (`RULES` § 1).
+# Désarmé : les paquets sont posés, la configuration rendue, l'unité installée
+# — mais NI activée NI démarrée. Un `--check` montre alors exactement ce que
+# l'armement fera, avant que quiconque l'arme.
+#
+# Armer :  ansible-playbook playbooks/01_server.yml -e '{"sentinel_server_enabled": true}'
+# La forme JSON n'est pas du style : `-e x=true` passe une CHAÎNE, et
+# `00_garde.yml` la refuse pour cette raison.
+sentinel_server_enabled: false
+
+# --- Version du moteur — ÉPINGLÉE, à un seul endroit ------------------------
+# Une version flottante fait d'un `apply` de routine une mise à jour non
+# décidée du moteur de sécurité, sur une machine de production. Cette valeur
+# est aussi celle des agents (`P01.1`) : manager et agents partagent la
+# version majeure, et c'est le rôle serveur qui la porte.
+#
+# ⚠️ Le choix du MINEUR n'est pas neutre pour `D4` (inventaire de
+# vulnérabilités, lot `P01.9`) : voir le README du rôle, § « La question
+# ouverte ». À trancher AVANT `P01.9`, pas après.
+sentinel_server_wazuh_version: "4.7.5"
+
+# Empreinte de la clé de dépôt. Le rôle la VÉRIFIE et refuse d'installer si
+# elle ne correspond pas. La chaîne d'approvisionnement est la menace n° 2 du
+# classement `B1` : un dépôt de paquets ajouté sans vérifier sa clé est
+# exactement cette menace, installée de nos propres mains.
+sentinel_server_repo_key_url: "https://packages.wazuh.com/key/GPG-KEY-WAZUH"
+
+# ⚠️ EMPREINTE NON CONFIRMÉE — elle est recopiée de mémoire, PAS relevée sur la
+# source officielle. Une empreinte fausse ne protège de rien : elle donne
+# l'apparence d'un contrôle. Le rôle REFUSE donc de s'exécuter tant que le
+# drapeau ci-dessous est `false`.
+#
+# Pour la confirmer, avant le premier `--check` :
+#   1. relever l'empreinte publiée par l'éditeur (documentation officielle) ;
+#   2. la comparer à celle de la clé effectivement servie :
+#        curl -fsSL https://packages.wazuh.com/key/GPG-KEY-WAZUH \
+#          | gpg --show-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}'
+#   3. si les deux concordent, poser la valeur ici et passer le drapeau à
+#      `true`, dans le MÊME commit, avec la source en message.
+#
+# Si elles ne concordent pas : ne pas installer, et le dire. C'est exactement
+# le cas que ce contrôle existe pour attraper.
+#
+# `gitleaks:allow` — 40 caractères hexadécimaux à forte entropie, donc reconnus
+# comme une « generic-api-key ». C'est un FAUX POSITIF, et il est de la meilleure
+# espèce : une empreinte de clé publique est faite pour être publiée. Sa valeur
+# tient précisément à ce que tout le monde puisse la comparer. La garder secrète
+# n'aurait aucun sens — on ne pourrait plus vérifier la clé contre elle.
+#
+# Ce commentaire ne couvre que les commits À VENIR qui toucheront cette ligne —
+# nécessaire, puisque la valeur changera quand elle sera relevée sur la source
+# officielle. Le commit qui l'a introduite est éteint par `.gitleaksignore` :
+# le gate scanne l'historique, pas l'arbre de travail.
+sentinel_server_repo_key_fingerprint: "0DCFCA5547B19D2A6099506096B3EE5F29111145"  # gitleaks:allow
+sentinel_server_repo_key_confirmee: false
+sentinel_server_repo_url: "https://packages.wazuh.com/4.x/apt/"
+sentinel_server_repo_composant: "main"
+sentinel_server_repo_suite: "stable"
+
+# --- Écoute — condition 3 d'ADR-003 -----------------------------------------
+# L'interface vient de l'inventaire (`sentinel_server_listen_interface`).
+# L'ADRESSE, elle, est résolue SUR LA MACHINE à partir des faits : la figer ici
+# reviendrait à graver une IP de tailnet dans le dépôt, et elle changera.
+sentinel_server_port_evenements: 1514
+sentinel_server_port_enrolement: 1515
+sentinel_server_port_api: 55000
+
+# --- Le `.env` de la machine ------------------------------------------------
+# Les secrets vivent LÀ, jamais dans l'inventaire, jamais dans le dépôt.
+# Le rôle pose des permissions ; il ne pose pas de valeurs (`RULES` § 4).
+sentinel_server_env_file: "{{ sentinel_install_dir }}/.env"
+
+# --- Rétention des journaux (G1) --------------------------------------------
+# 90 jours en ligne, 12 mois d'archive compressée.
+sentinel_server_retention_jours: 90
+sentinel_server_archive_mois: 12
+
+# --- Propriété des fichiers posés -------------------------------------------
+sentinel_server_owner: "root"
+sentinel_server_group: "wazuh"
+sentinel_server_config_mode: "0640"
+sentinel_server_secret_mode: "0600"
+
+# --- Désinstallation --------------------------------------------------------
+# `false` par défaut, évidemment. La désinstallation est un geste explicite :
+#   ansible-playbook playbooks/01_server.yml -e '{"sentinel_server_desinstaller": true}'
+# C'est la réversibilité promise par ADR-001, rendue jouable plutôt qu'écrite.
+sentinel_server_desinstaller: false
+# Purger l'ÉTAT (journaux, base des agents) en plus des paquets. Séparé de la
+# désinstallation : retirer le logiciel et détruire les preuves ne sont pas le
+# même geste, et le second ne s'improvise pas (`RULES` § 4 — les journaux
+# décrivent l'infrastructure entière).
+sentinel_server_purger_etat: false

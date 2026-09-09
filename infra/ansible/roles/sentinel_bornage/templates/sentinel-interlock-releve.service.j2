@@ -1,0 +1,32 @@
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle sentinel_bornage).
+# Source : infra/ansible/roles/sentinel_bornage/templates/sentinel-interlock-releve.service.j2
+#
+# Unité de l'interlock de relève — condition 2 d'ADR-003.
+# LIVRÉE DÉSARMÉE : posée, ni activée ni démarrée. Armer est un geste
+# d'exploitation, décrit par un runbook (.agent/RULES.md § 1).
+#
+# Préfixe `sentinel-` : c'est notre unité. Les unités de HQ sont `40kt1-*` et
+# nous ne les touchons pas (docs/contrat-hq.md).
+
+[Unit]
+Description=Sentinelle — interlock de relève (arrête le serveur central si la relève de HQ s'arme)
+Documentation=file://{{ sentinel_install_dir }}/bin/sentinel-interlock-releve.sh
+# Pas de `Requires` sur wazuh-manager : l'interlock doit pouvoir tourner même
+# si le moteur est déjà arrêté. Un interlock qui dépend de ce qu'il surveille
+# ne surveille rien.
+
+[Service]
+Type=oneshot
+ExecStart={{ sentinel_bornage_interlock_script }}
+User=root
+
+# Il LIT l'état de HQ et arrête une unité. Rien d'autre.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=true
+# Pas de ReadWritePaths : ce script n'écrit AUCUN fichier. Il lit, et il parle
+# à systemd. S'il se met un jour à écrire, cette ligne doit le refuser.
+
+[Install]
+WantedBy=multi-user.target

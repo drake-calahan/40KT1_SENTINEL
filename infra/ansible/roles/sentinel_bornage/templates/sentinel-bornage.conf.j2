@@ -1,0 +1,35 @@
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle sentinel_bornage).
+# Source : infra/ansible/roles/sentinel_bornage/templates/sentinel-bornage.conf.j2
+#
+# Condition 1 d'ADR-003 : bornage cgroup PERMANENT du serveur central.
+#
+# Pourquoi ces valeurs : le standby a 16 Go et porte déjà le miroir Postgres et
+# la relève en lecture seule. 1,5 Go laisse les deux respirer. Les changer est
+# une décision d'ADR, pas un réglage d'inventaire (.agent/RULES.md § 2).
+#
+# Vérification sur la machine — c'est ce qui rend la condition vérifiable
+# plutôt que déclarative :
+#   systemctl show {{ sentinel_bornage_unite }} -p MemoryMax -p MemoryHigh -p CPUQuotaPerSecUSec
+#
+# Ce fichier ne DÉMARRE rien. Poser un plafond n'arme pas : ça borne.
+
+[Service]
+# MemoryHigh freine l'allocation en récupérant de la mémoire ; MemoryMax tue.
+# Sans le palier, le moteur passe directement du confort à l'OOM kill — et on
+# découvre le plafond par un service mort plutôt que par un service lent.
+MemoryHigh={{ sentinel_bornage_memory_high }}
+MemoryMax={{ sentinel_bornage_memory_max }}
+MemorySwapMax=0
+
+# Part de CPU plafonnée. Le moteur ne doit pas disputer le CPU au miroir
+# pendant la restauration nocturne.
+CPUQuota={{ sentinel_bornage_cpu_quota }}
+
+# En cas de dépassement mémoire, systemd tue le service — et NE le redémarre
+# pas en boucle. Un service tué par l'OOM qui se relance indéfiniment cache le
+# problème et consomme la machine qu'il devait épargner.
+Restart=no
+
+# Priorité basse en écriture disque : la sauvegarde et la restauration du
+# miroir passent avant la collecte de journaux de sécurité.
+IOSchedulingClass=idle

@@ -47,6 +47,26 @@ hq_tournament_mode_file: "{{ hq_stack_dir }}/node-state/tournament-mode"
 # une seule preuve de câblage, deux destinations (salon et sujet distincts).
 hq_notify_script: "{{ hq_stack_dir }}/scripts/notify.sh"
 
+# --- L'état de la relève (ADR-003 condition 2, C3) --------------------------
+# HQ arme et désarme la relève ; Sentinelle LIT cet état et s'efface. Elle ne
+# l'arme, ne le désarme et ne le retarde jamais (docs/contrat-hq.md).
+#
+# ⚠️ CHEMIN NON CONFIRMÉ. Le contrat de frontière nomme l'objet — « l'état de la
+# relève (armée / au repos) » — mais pas le fichier qui le porte : ce mécanisme
+# vit dans `scripts/failover.py` et `ADR-061`, côté HQ. La valeur ci-dessous est
+# une HYPOTHÈSE, calquée sur le témoin de mode tournoi qui vit dans le même
+# répertoire.
+#
+# Tant que `hq_failover_state_confirme` vaut `false`, l'interlock de `P01.4` se
+# pose mais **refuse de s'armer** : un automate qui arrête le serveur de
+# sécurité en se fondant sur un chemin deviné est pire que pas d'interlock —
+# il s'arrêterait au hasard, ou jamais, sans qu'on sache lequel.
+#
+# À confirmer en portant le jumeau du contrat dans HQ (`P00.5`), et à consigner
+# des DEUX côtés : une frontière écrite d'un seul côté n'est pas une frontière.
+hq_failover_state_file: "{{ hq_stack_dir }}/node-state/failover-armed"
+hq_failover_state_confirme: false
+
 # --- Bornage des ressources -------------------------------------------------
 # Plafond appliqué au serveur central quand il cohabite avec un nœud de
 # production (cas (a) d'ADR-003). Ce qui rend la condition VÉRIFIABLE plutôt

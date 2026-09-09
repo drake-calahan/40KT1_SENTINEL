@@ -1,0 +1,72 @@
+---
+# Rôle `sentinel_bornage` — les deux conditions vérifiables d'ADR-003.
+#
+#   condition 1 : bornage `cgroup` PERMANENT (mémoire et CPU plafonnés) ;
+#   condition 2 : ARRÊT du serveur central quand la relève de HQ s'arme (`C3`).
+#
+# ── POURQUOI DEUX GARDES DIFFÉRENTES DANS CE RÔLE ──────────────────────────
+# Les deux moitiés n'ont pas la même nature, donc pas le même régime :
+#
+#   Le PLAFOND est une contrainte. Il ne fait rien : il empêche. Le poser
+#   n'arme rien — au contraire, il RÉDUIT ce que la machine peut subir. Il est
+#   donc posé sans garde, et `sentinel_server` REFUSE de s'armer sans lui.
+#
+#   L'INTERLOCK est un automate. Il arrête un service. C'est un geste, donc il
+#   est livré désarmé comme tout le reste (`RULES` § 1) : l'unité et le timer
+#   sont posés, ni activés ni démarrés.
+#
+# Confondre les deux donnerait soit un plafond qu'on oublie d'armer — et la
+# condition 1 redevient déclarative —, soit un automate armé par un merge.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# La garde de l'INTERLOCK seulement. Le plafond, lui, se pose toujours.
+sentinel_bornage_interlock_enabled: false
+
+# --- Le plafond (condition 1) -----------------------------------------------
+# Les valeurs viennent de `group_vars/all/main.yml` — `sentinel_server_memory_max`
+# et `sentinel_server_cpu_quota` — et ADR-003 les justifie : sur les 16 Go du
+# standby, 1,5 Go laisse le miroir Postgres et la relève en lecture seule
+# respirer. Les modifier est une décision d'ADR, pas un réglage.
+#
+# `MemoryHigh` en plus de `MemoryMax` : la première freine l'allocation en
+# récupérant de la mémoire, la seconde tue. Sans le palier, le moteur passe
+# directement du confort au `OOM kill` — et on découvre le plafond par un
+# service mort plutôt que par un service lent.
+sentinel_bornage_memory_max: "{{ sentinel_server_memory_max }}"
+sentinel_bornage_memory_high: "1200M"
+sentinel_bornage_cpu_quota: "{{ sentinel_server_cpu_quota }}"
+
+# L'unité bornée. Portée par le rôle serveur ; répétée ici pour que ce rôle
+# soit jouable seul (le drop-in doit pouvoir précéder l'installation).
+sentinel_bornage_unite: "wazuh-manager.service"
+sentinel_bornage_dropin_dir: "/etc/systemd/system/{{ sentinel_bornage_unite }}.d"
+sentinel_bornage_dropin: "{{ sentinel_bornage_dropin_dir }}/sentinel-bornage.conf"
+
+# --- L'interlock (condition 2) ----------------------------------------------
+sentinel_bornage_interlock_script: "{{ sentinel_install_dir }}/bin/sentinel-interlock-releve.sh"
+sentinel_bornage_interlock_unite: "sentinel-interlock-releve.service"
+sentinel_bornage_interlock_timer: "sentinel-interlock-releve.timer"
+
+# Cadence de lecture de l'état de la relève. Une minute : la relève de HQ n'est
+# pas une bascule à la seconde, et interroger plus souvent ferait de ce timer
+# une charge sur la machine qu'il protège.
+sentinel_bornage_interlock_cadence: "1min"
+
+# Que fait l'interlock quand il N'A PAS PU lire l'état de la relève ?
+#
+# `signaler` (défaut) — il ne touche à rien et le crie dans le journal.
+# `arreter`           — il arrête le serveur central par précaution.
+#
+# Le défaut est `signaler`, et le raisonnement tient en deux temps :
+#
+#   1. agir sur une mesure qu'on n'a pas pu prendre est exactement ce que
+#      `RULES` § 1 interdit — un `ok` n'est pas un `inconnu`, et un `inconnu`
+#      n'est pas un `armé` non plus ;
+#   2. le risque que la condition 2 couvre — le moteur qui mange la mémoire du
+#      standby pendant que la relève sert la production — est DÉJÀ borné par la
+#      condition 1, qui est permanente et inconditionnelle. L'interlock est un
+#      raffinement au-dessus d'un plafond, pas la seule protection.
+#
+# Si le PO préfère l'inverse, `arreter` est un choix défendable : il se pose
+# ici, il se consigne, et il n'a pas besoin d'un amendement d'ADR.
+sentinel_bornage_interlock_sur_inconnu: "signaler"

@@ -1,0 +1,38 @@
+---
+# Handlers du rôle `sentinel_server`.
+#
+# Même forme que le gabarit (roles/GABARIT.md § 3) : l'affirmation est déclarée
+# EN PREMIER sur le même `listen`, donc le refus tombe avant le redémarrage.
+#
+# La liste autorisée n'est pas le préfixe `sentinel-` ici mais
+# `sentinel_server_unites_autorisees`, parce que le manager est un logiciel
+# tiers nommé par son éditeur (`wazuh-manager.service`). C'est une exception
+# NOMMÉE, pas une garde levée : rien d'autre que cette liste ne passe, et
+# surtout aucune unité de HQ.
+
+- name: Refuser de redémarrer une unité qui n'est pas à nous
+  ansible.builtin.assert:
+    that:
+      - item in sentinel_server_unites_autorisees
+    fail_msg: >-
+      REFUS : « {{ item }} » n'est pas dans les unités que ce rôle a le droit de
+      redémarrer ({{ sentinel_server_unites_autorisees | join(', ') }}). Les
+      unités de 40KT1_HQ ({{ sentinel_server_unites_de_hq | join(', ') }}) se
+      LISENT. `patator-standby` porte le miroir Postgres et la relève en lecture
+      seule : un redémarrage de trop pendant la pose d'un outil de sécurité
+      dégrade le secours du parc. Voir .agent/RULES.md § 3 et docs/contrat-hq.md.
+    quiet: true
+  loop: "{{ [sentinel_server_unite] }}"
+  listen: redemarrer le serveur central
+
+- name: Redémarrer le serveur central
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_server_unite }}"
+    state: restarted
+    daemon_reload: true
+  become: true
+  # Désarmé, l'unité est posée mais arrêtée. La « redémarrer » la démarrerait,
+  # et ce serait un armement par effet de bord — exactement ce que RULES § 1
+  # interdit à un commit de faire.
+  when: sentinel_server_enabled | bool
+  listen: redemarrer le serveur central

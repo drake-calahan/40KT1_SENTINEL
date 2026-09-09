@@ -1,0 +1,32 @@
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle « sentinel_server »).
+# Source : infra/ansible/roles/sentinel_server/templates/apt-preferences-wazuh.j2
+#
+# Épingle la version du moteur de sécurité. Sans cet épinglage, un `apt upgrade`
+# de routine — ou `unattended-upgrades`, qui tourne sur ce nœud — remplace le
+# moteur de sécurité une nuit, sans que personne ne l'ait décidé, sur une
+# machine qui porte le miroir Postgres et la relève du parc.
+#
+# Ce fichier est la première des deux gardes. La seconde est `apt-mark hold`,
+# posée par le rôle : `preferences` empêche apt de PROPOSER une autre version,
+# le `hold` l'empêche de la POSER quand même.
+#
+# Changer de version est un geste décidé : on modifie
+# `sentinel_server_wazuh_version` dans le dépôt, en PR, et on rejoue le rôle.
+
+Package: {{ sentinel_server_paquet }}
+Pin: version {{ sentinel_server_wazuh_version }}-*
+Pin-Priority: 1001
+
+# Priorité 1001 et non 990 : au-dessus de 1000, apt accepte de RÉTROGRADER pour
+# tenir l'épingle. C'est ce qu'on veut — si une version plus récente a été
+# posée par accident, rejouer le rôle ramène celle qu'on a décidée.
+
+# Le reste du dépôt ne doit rien tirer d'autre. Le profil frugal exclut
+# l'indexeur et la console (ADR-001) : on les rend non installables depuis ce
+# dépôt plutôt que de compter sur le fait que personne ne les demandera.
+{% for paquet in sentinel_server_paquets_interdits %}
+
+Package: {{ paquet }}
+Pin: origin ""
+Pin-Priority: -1
+{% endfor %}

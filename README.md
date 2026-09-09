@@ -7,7 +7,7 @@
 
 > **État du dépôt : cadrage répondu.** Trente réponses sur trente (2026-09-07) ;
 > les quatre structurantes (`C1`, `E2`, `E4`, `H3`) sont tranchées.
-> `ADR-002` et `ADR-003` sont *Acceptées* ; `ADR-001` reste *Proposé* (`P00.2`).
+> Les trois ADR (`001`, `002`, `003`) sont *Acceptées* (2026-09-07).
 > **Rien n'est installé, rien n'est armé** — aucune machine du parc ne porte
 > quoi que ce soit de ce dépôt.
 >

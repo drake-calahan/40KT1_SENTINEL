@@ -1,0 +1,68 @@
+---
+# Armement du rôle `gabarit`.
+#
+# ══ CE FICHIER N'EST ATTEINT QUE SI UN HUMAIN L'A DEMANDÉ ══════════════════
+# `tasks/main.yml` porte le `when: gabarit_enabled | bool`. La valeur du dépôt
+# est `false` et le reste (`RULES` § 1 · CI `garde-armement`). On arrive ici
+# uniquement par :
+#
+#     ansible-playbook … -e '{"gabarit_enabled": true}'
+#
+# joué par un humain qui déroule un runbook, jamais par un merge, jamais par
+# un `apply` de routine. C'est la définition d'« armer » dans ce dépôt.
+#
+# La forme JSON n'est pas un détail de style : `-e gabarit_enabled=true` passe
+# une CHAÎNE, et `00_garde.yml` la refuse pour cette raison.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Le désarmement d'urgence est un frein hors bande : il ne demande que SSH et
+# un `touch`. Il est donc lu ICI, au dernier moment, et pas en préconditions —
+# entre la garde et l'armement, quelqu'un a pu poser le témoin.
+- name: Lire le témoin de désarmement d'urgence
+  ansible.builtin.stat:
+    path: "{{ sentinel_disarm_file }}"
+  register: gabarit_temoin_desarmement
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Refuser d'armer si le témoin de désarmement est présent ou illisible
+  ansible.builtin.fail:
+    msg: >-
+      {{
+        "ARMEMENT REFUSÉ : le témoin de désarmement d'urgence "
+        ~ sentinel_disarm_file ~ " est PRÉSENT. Il a été posé par quelqu'un, "
+        ~ "et il se retire par le même geste — jamais par un playbook."
+        if ('stat' in gabarit_temoin_desarmement
+            and gabarit_temoin_desarmement.stat.exists)
+        else
+        "ARMEMENT REFUSÉ : le témoin de désarmement " ~ sentinel_disarm_file
+        ~ " n'a pas pu être LU. État inconnu. Un `ok` n'est pas un `inconnu` "
+        ~ "(.agent/RULES.md § 1) : on n'arme pas sur une mesure qu'on n'a "
+        ~ "pas pu prendre."
+      }}
+  when: >-
+    'stat' not in gabarit_temoin_desarmement
+    or gabarit_temoin_desarmement.stat.exists
+
+# À REMPLACER : l'activation réelle du rôle.
+#
+# Elle prend cette forme, et seulement à cet endroit du rôle :
+#
+#   - name: Activer et démarrer l'unité Sentinelle
+#     ansible.builtin.systemd_service:
+#       name: "{{ gabarit_unite }}"
+#       enabled: true
+#       state: started
+#       daemon_reload: true
+#     become: true
+#
+# Rien d'autre ne s'ajoute ici : ni configuration, ni pose de fichier. Ce qui
+# se pose se pose désarmé, en `10_pose.yml`, pour être relisible en `--check`.
+
+- name: Consigner que le rôle a été armé
+  ansible.builtin.debug:
+    msg: >-
+      ARMÉ : {{ gabarit_unite }} sur {{ inventory_hostname }}. Mode tournoi lu :
+      {{ gabarit_mode_tournoi }}. Ce geste appartient à un runbook et à un
+      humain — s'il apparaît dans une exécution automatique, c'est un défaut.

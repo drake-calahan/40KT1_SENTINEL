@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle sentinel_bornage).
+# Source : infra/ansible/roles/sentinel_bornage/templates/sentinel-interlock-releve.sh.j2
+#
+# ── CE QUE FAIT CE SCRIPT ──────────────────────────────────────────────────
+# Il LIT l'état de la relève de 40KT1_HQ. Si elle est armée, il ARRÊTE le
+# serveur central de Sentinelle — condition 2 d'ADR-003, réponse C3.
+#
+# ── CE QU'IL NE FAIT JAMAIS ────────────────────────────────────────────────
+# Il n'arme pas la relève. Il ne la désarme pas. Il ne la retarde pas. Il ne
+# touche à AUCUN fichier de HQ. Deux automates qui se posent le même verrou est
+# un mode de panne connu (docs/contrat-hq.md § 2).
+#
+# Il ne REDÉMARRE pas non plus le serveur central quand la relève retombe. Le
+# redémarrage est un geste d'exploitation : quelqu'un doit regarder pourquoi la
+# relève s'est armée avant de remettre le moteur de sécurité en marche. Un
+# automate qui redémarre tout seul masque exactement l'incident qu'on veut voir.
+#
+# ── TROIS ÉTATS, JAMAIS DEUX ───────────────────────────────────────────────
+#   armée    -> le fichier témoin existe          -> on arrête
+#   au repos -> le fichier est absent, dossier ok -> on ne fait rien
+#   inconnu  -> le dossier lui-même est illisible -> {{ sentinel_bornage_interlock_sur_inconnu }}
+#
+# « Absent » et « je n'ai pas pu regarder » ne sont pas le même état, et les
+# confondre est le faux vert que ce dépôt existe pour empêcher
+# (.agent/RULES.md § 1).
+
+set -euo pipefail
+
+TEMOIN="{{ hq_failover_state_file }}"
+DOSSIER="$(dirname "${TEMOIN}")"
+UNITE="{{ sentinel_bornage_unite }}"
+SUR_INCONNU="{{ sentinel_bornage_interlock_sur_inconnu }}"
+
+journal() {
+  # Vers le journal systemd : c'est là que l'exploitant regarde, et c'est
+  # horodaté sans qu'on ait à s'en occuper.
+  echo "$1"
+}
+
+# --- État inconnu : le dossier lui-même n'est pas lisible --------------------
+if [[ ! -d "${DOSSIER}" ]] || [[ ! -r "${DOSSIER}" ]]; then
+  if [[ "${SUR_INCONNU}" == "arreter" ]]; then
+    journal "INCONNU: ${DOSSIER} illisible. Arret du serveur central par precaution (reglage sur_inconnu=arreter)."
+    systemctl stop "${UNITE}" || true
+    exit 0
+  fi
+  journal "INCONNU: ${DOSSIER} illisible. Etat de la releve NON MESURE."
+  journal "  Aucune action: on n'agit pas sur une mesure qu'on n'a pas pu prendre (RULES 1)."
+  journal "  Le plafond cgroup (condition 1 d'ADR-003) reste actif et borne le risque."
+  journal "  Si ce message se repete, le chemin est faux: le confirmer cote HQ (P00.5)."
+  # Sortie 0 volontaire : « je n'ai pas pu mesurer » n'est pas une panne de CE
+  # service. Le faire échouer noierait le journal et le timer finirait masqué.
+  exit 0
+fi
+
+# --- Relève armée : on s'efface ---------------------------------------------
+if [[ -e "${TEMOIN}" ]]; then
+  if systemctl is-active --quiet "${UNITE}"; then
+    journal "RELEVE ARMEE (${TEMOIN} present). Arret de ${UNITE}."
+    journal "  Le standby sert la production: sa memoire va a la releve, pas a nous."
+    journal "  Le redemarrage est un geste HUMAIN: regarder d'abord pourquoi la releve s'est armee."
+    systemctl stop "${UNITE}"
+  fi
+  exit 0
+fi
+
+# --- Relève au repos : rien à faire, et on se tait --------------------------
+# Pas de message ici. Un interlock qui écrit une ligne par minute quand tout va
+# bien rend son propre journal illisible le jour où il a quelque chose à dire.
+exit 0

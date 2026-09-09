@@ -10,20 +10,26 @@
 # les deux nœuds Linux), repris de l'inventaire de `40KT1_HQ`. Ce ne sont pas
 # des comptes de service à créer.
 #
-# --- CE QUI MANQUE ENCORE, ET POURQUOI ---------------------------------------
+# --- L'HÔTE DU SERVEUR CENTRAL, ET POURQUOI CELUI-LÀ -------------------------
 #
-# Le groupe `sentinel_server` est VIDE, et il le reste tant qu'`ADR-003` n'est
-# pas acceptée. Le remplir maintenant reviendrait à choisir l'hôte du serveur
-# central par un commit plutôt que par une décision — et cet hôte ne se change
-# pas après coup sans tout ré-enrôler.
+# `ADR-003` est **Acceptée** (2026-09-07) : le serveur central vit sur
+# `patator-standby`, en profil frugal. Le groupe `sentinel_server` porte donc un
+# hôte — et un seul. Il n'est plus vide, et ce n'est pas un commit qui a choisi :
+# c'est une décision, écrite, datée, avec une revue au **2027-03-07**.
 #
-# Les trois candidats sont décrits dans `docs/adr/ADR-003-hote-du-serveur-central.md` :
-#   (a) patator-standby, profil frugal, sous conditions de bornage
-#   (b) un matériel dédié (mini-PC), non acquis à ce jour
-#   (c) patator-tower — écarté : le serveur surveillerait son propre hôte
+# `patator-standby` apparaît DEUX FOIS dans cet inventaire, et c'est voulu : il
+# porte un agent (comme la tour) ET le serveur central. C'est le même hôte, donc
+# les mêmes variables — elles sont définies une seule fois, sous
+# `sentinel_agents_linux`, et le groupe `sentinel_server` ne fait que le
+# référencer. Ne pas les recopier : deux définitions divergent toujours.
 #
-# Un groupe vide est délibéré et visible. Un groupe rempli au hasard produit un
-# play qui rend `ok` en ne touchant rien, et c'est le pire des modes de panne.
+# La conséquence à ne jamais perdre de vue : sécurité et secours partagent un
+# domaine de panne. C'est la dette assumée d'`ADR-003`, et c'est ce qui rend les
+# conditions 1 (bornage `cgroup`) et 2 (arrêt pendant la relève) non
+# négociables — lot `P01.4`.
+#
+# `patator-tower` a été écarté : un serveur qui surveille son propre hôte perd
+# ses preuves avec lui.
 
 all:
   children:
@@ -75,5 +81,17 @@ all:
         # Vide aujourd'hui : `AEGIS-TOWER` n'entre au périmètre qu'en P04.0.
         sentinel_agents_workstations:
 
-    # --- Le serveur central — hôte à trancher (C1 / ADR-003) ----------------
+    # --- Le serveur central — hôte tranché par ADR-003 (C1) -----------------
+    # Profil frugal : pas d'indexeur, pas de console. Écoute sur `tailscale0`
+    # UNIQUEMENT (condition 3 d'ADR-003, vérifiée en `P01.0` par `ss -lntp`).
     sentinel_server:
+      hosts:
+        # Référence seule : les variables de cet hôte sont plus haut.
+        patator-standby: {}
+      vars:
+        # Ce que le profil frugal veut dire, en clair, à un seul endroit.
+        sentinel_server_profil: "frugal"
+        # L'interface d'écoute. Jamais 0.0.0.0, jamais le nom public, jamais
+        # Funnel, jamais cloudflared (C4). Le nom est résolu sur la machine par
+        # le rôle : le mettre en dur ici serait une IP de tailnet figée.
+        sentinel_server_listen_interface: "tailscale0"

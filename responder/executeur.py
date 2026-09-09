@@ -1,9 +1,13 @@
 """L'exécuteur — il décide, il journalise, et il n'agit que si les quatre gardes passent.
 
-Ce module ne contient **aucun geste privilégié** : les quatre gestes armables
-arrivent en `P03.6`, derrière l'interface `Geste câblé` ci-dessous. Tant qu'aucun
-n'est câblé, une décision favorable se journalise en `aurait_execute` avec son
-motif — ce qui est l'état exact de la phase, et non un succès silencieux.
+Ce module ne contient **aucun geste privilégié**, et n'en contiendra jamais : les
+quatre gestes armables vivent dans `responder.gestes` (`P03.6`), derrière
+l'interface `GesteCable` ci-dessous. Un nœud sur lequel aucun geste n'est câblé
+journalise `aurait_execute` avec son motif — ce qui est un état, et non un succès
+silencieux.
+
+Câbler un geste **n'arme rien** : les quatre gardes restent devant, dans l'ordre,
+et `SENTINEL_RESPONSE_ENABLED` reste `false` dans le dépôt.
 
 **Le mode à blanc ne change qu'une seule chose : le geste n'est pas exécuté.**
 Toutes les gardes, le budget compris, se comportent à l'identique. Un mode à
@@ -21,8 +25,13 @@ from responder.gardes import ModeTournoi, desarme, garde_catalogue, garde_tourno
 from responder.journal import Journal
 from responder.ordre import Ordre, OrdreInvalide
 
-GesteCable = Callable[[Ordre], None]
-"""Signature d'un geste réellement exécutable. Fourni par `P03.6`, jamais ici."""
+GesteCable = Callable[[Ordre], str | None]
+"""Signature d'un geste réellement exécutable — câblé par `responder.gestes` (`P03.6`).
+
+Il rend la description de **son** retour arrière, avec ses valeurs réelles, ou
+`None` pour retomber sur la phrase générique du catalogue. Il lève en cas
+d'échec : l'exécuteur rattrape et journalise `echoue`.
+"""
 
 
 @dataclass(frozen=True)
@@ -117,8 +126,33 @@ class Executeur:
         if empeche is not None:
             return self._journaliser_ordre(ordre, mode, "aurait_execute", empeche, severite)
 
-        self.gestes_cables[ordre.geste](ordre)
-        decision = self._journaliser_ordre(ordre, mode, "execute", trouve.retour_arriere, severite)
+        # Le geste est joué ICI, et son échec est un RÉSULTAT, pas une exception
+        # qui remonte. Laisser l'erreur s'échapper laisserait l'ordre sans aucune
+        # entrée au journal : ni geste, ni refus, ni trace. On croirait la menace
+        # traitée, et le budget ne compterait pas la tentative — ce qui
+        # autoriserait à la rejouer sans fin.
+        try:
+            retour_arriere = self.gestes_cables[ordre.geste](ordre)
+        except Exception as erreur:
+            decision = self._journaliser_ordre(
+                ordre,
+                mode,
+                "echoue",
+                f"{type(erreur).__name__} : {erreur}",
+                severite="rouge",
+            )
+            # Une tentative qui a échoué a quand même consommé une tentative.
+            if etat_budget is EtatBudget.DERNIER:
+                self.budget.geler("dernier geste du budget horaire consommé (tentative en échec)")
+            return decision
+
+        # Le motif journalisé est le retour arrière RÉEL rendu par le geste — avec
+        # ses valeurs, prêt à copier-coller — et non la phrase générique du
+        # catalogue. À 3 h du matin, retrouver la commande soi-même est de
+        # l'arbitrage, et `ADR-062` demande qu'on puisse défaire sans arbitrage.
+        decision = self._journaliser_ordre(
+            ordre, mode, "execute", retour_arriere or trouve.retour_arriere, severite
+        )
         if etat_budget is EtatBudget.DERNIER:
             self.budget.geler("dernier geste du budget horaire consommé")
         return decision

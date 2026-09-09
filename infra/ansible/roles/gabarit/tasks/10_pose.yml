@@ -1,0 +1,62 @@
+---
+# Pose du rôle `gabarit` : les fichiers et l'unité.
+#
+# ── CE FICHIER NE DÉMARRE RIEN ─────────────────────────────────────────────
+# Ni `state: started`, ni `enabled: true`, ni `restarted`. Poser sans démarrer
+# est le point entier du gabarit : un `--check --diff` montre alors exactement
+# ce que l'armement fera, AVANT que quiconque l'arme.
+# Ce qui démarre vit dans `20_armement.yml`.
+# ═══════════════════════════════════════════════════════════════════════════
+
+- name: Créer l'arborescence du rôle
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ gabarit_owner }}"
+    group: "{{ gabarit_group }}"
+    mode: "{{ gabarit_dir_mode }}"
+  loop:
+    - "{{ sentinel_install_dir }}"
+    - "{{ gabarit_config_dir }}"
+    - "{{ sentinel_state_dir }}"
+    - "{{ sentinel_log_dir }}"
+  become: true
+
+# La configuration est RENDUE, jamais éditée en place : un fichier édité à la
+# main sur une machine n'est plus dans le dépôt, et la revue en PR ne le voit
+# pas. `RULES` § 5 dit la même chose des règles de détection.
+- name: Rendre la configuration depuis le template
+  ansible.builtin.template:
+    src: gabarit.conf.j2
+    dest: "{{ gabarit_config_file }}"
+    owner: "{{ gabarit_owner }}"
+    group: "{{ gabarit_group }}"
+    mode: "{{ gabarit_file_mode }}"
+  become: true
+  notify: redemarrer les unites sentinelle
+
+# À REMPLACER : la pose de l'unité systemd du vrai rôle.
+#
+# Elle s'écrit avec `ansible.builtin.template` vers
+# /etc/systemd/system/{{ gabarit_unite }}, suivie d'un `systemd_service` avec
+# `daemon_reload: true` et RIEN D'AUTRE — ni `enabled`, ni `state`.
+# Recharger le gestionnaire ne démarre rien ; c'est ce qui rend l'unité
+# visible à `systemctl status` sans l'activer.
+
+# ── Ce qu'on refuse de jouer, et qu'on signale ─────────────────────────────
+# Le cas type : la configuration posée ne prendra effet qu'après un
+# redémarrage d'un service de HQ (Docker, par exemple, pour la lecture des
+# événements de conteneurs). Le rôle NE le joue pas — il l'inscrit au bilan, et
+# un humain le joue dans une fenêtre choisie.
+#
+# À REMPLACER par la détection réelle du rôle. Le motif à conserver est la
+# forme : détecter, ajouter au signalement, ne pas agir.
+- name: Signaler un changement qui exigerait de toucher un service de HQ
+  ansible.builtin.set_fact:
+    gabarit_points_signales: >-
+      {{ gabarit_points_signales + [
+           'Un service appartenant à 40KT1_HQ devrait être redémarré pour que '
+           ~ gabarit_config_file ~ ' prenne effet. NON JOUÉ : ce rôle ne '
+           ~ 'redémarre que des unités sentinel-*. Geste humain, fenêtre choisie.'
+         ] }}
+  when: false  # À REMPLACER par la condition réelle de détection du rôle.

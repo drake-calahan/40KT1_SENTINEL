@@ -1,0 +1,227 @@
+---
+# Pose du serveur central : dépôt vérifié, paquet épinglé, configuration rendue.
+#
+# ── CE FICHIER NE DÉMARRE RIEN ─────────────────────────────────────────────
+# Le paquet `wazuh-manager` installe une unité systemd. Sur Debian et dérivés,
+# un paquet peut démarrer son service à l'installation : c'est exactement le
+# genre d'armement par effet de bord que RULES § 1 interdit. La parade est
+# posée AVANT le paquet (« policy-rc.d », plus bas) et retirée après.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── 1. La clé du dépôt, vérifiée avant d'être posée ───────────────────────
+- name: Créer le répertoire des trousseaux
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Télécharger la clé du dépôt dans un fichier temporaire
+  ansible.builtin.get_url:
+    url: "{{ sentinel_server_repo_key_url }}"
+    dest: /tmp/sentinel-repo-key.asc
+    mode: "0644"
+  become: true
+  register: sentinel_server_cle_telechargee
+  # En `--check`, `get_url` ne télécharge pas : la vérification d'empreinte qui
+  # suit n'a alors rien à lire. On le DIT plutôt que de laisser un `skipped`
+  # passer pour un contrôle réussi.
+  check_mode: false
+
+- name: Relever l'empreinte de la clé effectivement servie
+  ansible.builtin.command:
+    cmd: gpg --show-keys --with-colons /tmp/sentinel-repo-key.asc
+  become: true
+  register: sentinel_server_empreinte_relevee
+  changed_when: false
+  check_mode: false
+
+- name: L'empreinte servie correspond à l'empreinte attendue
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_empreinte_relevee.stdout is search(sentinel_server_repo_key_fingerprint)
+    fail_msg: >-
+      EMPREINTE NON CONFORME. La clé servie par
+      {{ sentinel_server_repo_key_url }} ne porte pas l'empreinte attendue
+      ({{ sentinel_server_repo_key_fingerprint }}). NE PAS INSTALLER, NE PAS
+      « réessayer », NE PAS mettre à jour l'empreinte pour faire passer le
+      contrôle : c'est précisément le cas que ce contrôle existe pour attraper
+      (menace n° 2 du classement B1). Prévenir le PO.
+    success_msg: "empreinte de la clé de dépôt : conforme"
+    quiet: true
+
+- name: Poser la clé du dépôt dans son propre trousseau
+  ansible.builtin.command:
+    cmd: >-
+      gpg --batch --yes --dearmor
+      -o /usr/share/keyrings/sentinel-wazuh.gpg
+      /tmp/sentinel-repo-key.asc
+    creates: /usr/share/keyrings/sentinel-wazuh.gpg
+  become: true
+
+- name: Retirer la clé temporaire
+  ansible.builtin.file:
+    path: /tmp/sentinel-repo-key.asc
+    state: absent
+  become: true
+
+# ── 2. Le dépôt, signé par CE trousseau et par aucun autre ────────────────
+# `signed-by` est le point : sans lui, la clé posée signerait n'importe quel
+# dépôt de la machine, y compris ceux de HQ. Sentinelle ajoute, elle n'élargit
+# pas la confiance des autres.
+- name: Déclarer le dépôt de paquets du moteur
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/sentinel-wazuh.gpg]
+      {{ sentinel_server_repo_url }} {{ sentinel_server_repo_suite }}
+      {{ sentinel_server_repo_composant }}
+    filename: sentinel-wazuh
+    state: present
+    update_cache: true
+  become: true
+
+# ── 3. Le paquet, à une version épinglée — et qui le RESTE ────────────────
+# Deux gardes, parce qu'une seule ne tient pas :
+#   - `apt preferences` empêche apt de proposer une version plus récente ;
+#   - `apt-mark hold` empêche `unattended-upgrades` de la poser quand même.
+# Les deux nœuds tournent `unattended-upgrades` : sans le `hold`, le moteur de
+# sécurité se met à jour tout seul, une nuit, sans que personne ne l'ait décidé.
+- name: Épingler la version du moteur au niveau d'apt
+  ansible.builtin.template:
+    src: apt-preferences-wazuh.j2
+    dest: /etc/apt/preferences.d/sentinel-wazuh.pref
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+# Sur Debian et dérivés, l'installation d'un paquet DÉMARRE son service. Ce
+# fichier fait échouer proprement toute tentative de démarrage pendant la pose,
+# et il est retiré juste après. Sans lui, `sentinel_server_enabled: false` ne
+# voudrait rien dire : le moteur tournerait dès l'installation.
+- name: Interdire tout démarrage de service pendant l'installation
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      # Posé par 40KT1_SENTINEL, rôle sentinel_server, le temps de l'installation.
+      # Rien ne démarre pendant une pose : armer est un geste d'exploitation
+      # (.agent/RULES.md § 1). Ce fichier est retiré à la fin du rôle.
+      exit 101
+    dest: /usr/sbin/policy-rc.d
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Installer le moteur, à la version épinglée
+  ansible.builtin.apt:
+    name: "{{ sentinel_server_paquet }}={{ sentinel_server_wazuh_version }}-*"
+    state: present
+    update_cache: true
+  become: true
+  notify: redemarrer le serveur central
+
+- name: Geler la version contre les mises à jour automatiques
+  ansible.builtin.dpkg_selections:
+    name: "{{ sentinel_server_paquet }}"
+    selection: hold
+  become: true
+
+- name: Lever l'interdiction de démarrage
+  ansible.builtin.file:
+    path: /usr/sbin/policy-rc.d
+    state: absent
+  become: true
+
+# ── 4. L'unité est installée, et elle reste ARRÊTÉE ───────────────────────
+# `daemon_reload` rend l'unité visible à `systemctl status` sans l'activer.
+# Ni `enabled`, ni `state` : ce qui démarre vit dans `20_armement.yml`.
+- name: Recharger le gestionnaire de services sans rien démarrer
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+- name: S'assurer que le moteur n'est ni activé ni démarré
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_server_unite }}"
+    enabled: false
+    state: stopped
+  become: true
+  when: not (sentinel_server_enabled | bool)
+
+# ── 5. La configuration, rendue depuis un template ────────────────────────
+- name: Rendre la configuration du manager
+  ansible.builtin.template:
+    src: ossec.conf.j2
+    dest: "{{ sentinel_server_ossec_conf }}"
+    owner: "{{ sentinel_server_owner }}"
+    group: "{{ sentinel_server_group }}"
+    mode: "{{ sentinel_server_config_mode }}"
+    # Une configuration invalide laisse le manager mort au prochain démarrage,
+    # et on l'apprend au pire moment. On garde la précédente sous la main.
+    backup: true
+  become: true
+  notify: redemarrer le serveur central
+
+- name: Rendre la configuration de l'API — écoute sur le tailnet seul
+  ansible.builtin.template:
+    src: api.yaml.j2
+    dest: "{{ sentinel_server_api_conf }}"
+    owner: "{{ sentinel_server_owner }}"
+    group: "{{ sentinel_server_group }}"
+    mode: "{{ sentinel_server_config_mode }}"
+    backup: true
+  become: true
+  notify: redemarrer le serveur central
+
+# ── 6. Le secret d'enrôlement — posé, jamais affiché ──────────────────────
+# La valeur vient du `.env` de la machine, lu en préconditions. Elle ne
+# transite ni par le dépôt, ni par l'inventaire, ni par la sortie d'une tâche.
+- name: Extraire la clé d'enrôlement du `.env` de la machine
+  ansible.builtin.set_fact:
+    sentinel_server_enroll_key: >-
+      {{ (sentinel_server_env_brut.content | b64decode)
+         | regex_search('(?m)^\s*SENTINEL_ENROLL_KEY\s*=\s*(\S+)', '\1')
+         | first }}
+  no_log: true
+
+- name: Poser le secret d'enrôlement
+  ansible.builtin.copy:
+    content: "{{ sentinel_server_enroll_key }}\n"
+    dest: "{{ sentinel_server_authd_pass }}"
+    owner: "{{ sentinel_server_owner }}"
+    group: "{{ sentinel_server_group }}"
+    mode: "{{ sentinel_server_secret_mode }}"
+  become: true
+  no_log: true
+  notify: redemarrer le serveur central
+
+# ── 7. Ce qu'on refuse de jouer, et qu'on signale ─────────────────────────
+# Le bornage `cgroup` (condition 1 d'ADR-003) et l'arrêt pendant la relève
+# (condition 2) appartiennent à `P01.4`. Tant qu'ils ne sont pas posés, armer
+# ce serveur ferait cohabiter le moteur avec le miroir Postgres SANS plafond.
+# Le rôle ne le décide pas à la place du PO : il l'inscrit au bilan.
+- name: Relever si le bornage des ressources est déjà posé
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ sentinel_server_unite }}.d/sentinel-bornage.conf"
+  register: sentinel_server_bornage
+  become: true
+  failed_when: false
+  changed_when: false
+
+- name: Signaler l'absence de bornage des ressources
+  ansible.builtin.set_fact:
+    # Guillemets DOUBLES : `\'` dans une chaîne Jinja simple-quotée n'est pas
+    # l'échappement qu'on croit — le lexer coupe à l'apostrophe et la tâche ne se
+    # charge même pas. Le français en est plein. Mesuré en CI le 2026-09-09.
+    sentinel_server_points_signales: >-
+      {{ sentinel_server_points_signales + [
+           "Bornage cgroup ABSENT (conditions 1 et 2 d'ADR-003, lot P01.4). "
+           ~ "Le moteur cohabiterait avec le miroir Postgres et la relève sans "
+           ~ "plafond mémoire. NON JOUÉ ici : P01.4 le pose. Ne pas armer avant."
+         ] }}
+  when: >-
+    'stat' not in sentinel_server_bornage
+    or not sentinel_server_bornage.stat.exists

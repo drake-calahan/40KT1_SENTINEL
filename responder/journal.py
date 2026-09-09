@@ -13,7 +13,7 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-RESULTATS_CONSOMMATEURS = frozenset({"execute", "aurait_execute"})
+RESULTATS_CONSOMMATEURS = frozenset({"execute", "aurait_execute", "echoue"})
 """Ce qui consomme le budget.
 
 Le mode à blanc consomme comme le mode armé, et c'est délibéré : la période à

@@ -1,0 +1,170 @@
+---
+# Préconditions du rôle `sentinel_server`.
+# Ce fichier ne pose rien. Il refuse de continuer sur un terrain non compris.
+
+# ── 1. La garde d'armement est un VRAI booléen ─────────────────────────────
+- name: La garde d'armement est un booléen, pas une chaîne
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_enabled is defined
+      - sentinel_server_enabled is boolean
+    fail_msg: >-
+      « sentinel_server_enabled » n'est pas un booléen
+      ({{ sentinel_server_enabled | default(None) | type_debug }}). Une chaîne
+      non vide est VRAIE en Jinja : « -e sentinel_server_enabled=false »
+      armerait le serveur central en croyant le désarmer. Forme correcte :
+      -e '{"sentinel_server_enabled": true}'. Voir .agent/RULES.md § 1.
+    quiet: true
+
+# ── 2. Sommes-nous sur l'hôte qu'ADR-003 a tranché ? ───────────────────────
+# Le groupe `sentinel_server` porte un hôte et un seul. Si ce rôle s'exécute
+# ailleurs, quelqu'un a déplacé le serveur central par un `--limit` plutôt que
+# par une décision — et cet hôte ne se change pas après coup sans tout
+# ré-enrôler (ADR-003).
+- name: Cet hôte est bien celui que le groupe `sentinel_server` désigne
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups['sentinel_server']
+    fail_msg: >-
+      {{ inventory_hostname }} n'appartient pas au groupe « sentinel_server »
+      ({{ groups['sentinel_server'] | default([]) | join(', ') | default('vide', true) }}).
+      L'hôte du serveur central est tranché par ADR-003 et se change par
+      amendement de l'ADR, pas par un --limit.
+    quiet: true
+
+# ── 3. L'empreinte de la clé de dépôt a-t-elle été confirmée ? ─────────────
+# La chaîne d'approvisionnement est la menace n° 2 du classement `B1`. Une
+# empreinte recopiée de mémoire et jamais relevée ne protège de rien : elle
+# donne l'apparence d'un contrôle, ce qui est pire que pas de contrôle.
+- name: L'empreinte de la clé de dépôt a été relevée sur la source officielle
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_repo_key_confirmee | bool
+    fail_msg: >-
+      L'empreinte de la clé du dépôt de paquets n'a PAS été confirmée
+      (sentinel_server_repo_key_confirmee = false). Ce rôle ajoute un dépôt
+      tiers à une machine de production : sans empreinte vérifiée, on installe
+      la menace n° 2 du classement B1 de nos propres mains. Marche à suivre
+      dans roles/sentinel_server/defaults/main.yml, au-dessus de la variable.
+    quiet: true
+
+# ── 4. Le profil frugal est-il encore vrai sur cette machine ? ─────────────
+# ADR-001 : manager SEUL. L'indexeur pèse 4 à 5 Go sur un hôte de 16 Go qui
+# porte déjà le miroir Postgres et la relève. S'il est là, le profil n'est plus
+# celui qu'on a décidé, et l'apprendre en RAM coûte un incident.
+- name: Relever les paquets interdits par le profil frugal
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Le profil frugal est respecté — aucun indexeur, aucune console
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_paquets_interdits
+        | select('in', ansible_facts.packages) | list | length == 0
+    fail_msg: >-
+      Profil frugal violé sur {{ inventory_hostname }} :
+      {{ sentinel_server_paquets_interdits | select('in', ansible_facts.packages) | join(', ') }}
+      {{ 'est installé' if (sentinel_server_paquets_interdits | select('in', ansible_facts.packages) | list | length == 1) else 'sont installés' }}.
+      ADR-001 retient le manager SEUL : l'indexeur et la console pèsent 4 à 5 Go
+      sur les 16 Go du standby, qui portent déjà le miroir Postgres et la relève
+      en lecture seule. Retirer ces paquets, ou amender ADR-001 — pas
+      contourner ce contrôle.
+    quiet: true
+
+# ── 5. L'interface d'écoute existe-t-elle, et porte-t-elle une adresse ? ────
+# Condition 3 d'ADR-003 : écoute sur `tailscale0` UNIQUEMENT (C4). L'adresse
+# est résolue ICI, depuis les faits de la machine — la figer dans le dépôt
+# reviendrait à graver une IP de tailnet qui changera.
+- name: L'interface d'écoute existe sur cette machine
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_listen_interface is defined
+      - sentinel_server_listen_interface in ansible_facts['interfaces']
+    fail_msg: >-
+      L'interface « {{ sentinel_server_listen_interface | default('(non définie)') }} »
+      est absente de {{ inventory_hostname }}. Le serveur central n'est joignable
+      QUE par le tailnet (C4 : jamais Funnel, jamais cloudflared, jamais le nom
+      public). Sans cette interface, il n'y a pas d'écoute correcte possible :
+      on ne pose rien. Vérifier que Tailscale est monté — il appartient à HQ,
+      donc ce rôle ne le répare pas.
+    quiet: true
+
+- name: Résoudre l'adresse d'écoute depuis les faits de la machine
+  ansible.builtin.set_fact:
+    sentinel_server_listen_ip: >-
+      {{ ansible_facts[sentinel_server_listen_interface]['ipv4']['address']
+         | default('') }}
+
+- name: L'interface d'écoute porte bien une adresse IPv4
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_listen_ip | length > 0
+    fail_msg: >-
+      « {{ sentinel_server_listen_interface }} » existe mais ne porte aucune
+      adresse IPv4 sur {{ inventory_hostname }}. On ne DEVINE pas une adresse
+      d'écoute : sans elle, le manager écouterait sur 0.0.0.0, c'est-à-dire
+      aussi sur le LAN. C'est précisément ce que C4 interdit.
+      Rappel : ce nœud a perdu son IPv4 quatre fois en trois semaines
+      (.agent/DISCOVERY.md) — ce n'est pas forcément un défaut du playbook.
+    quiet: true
+
+# ── 6. Le `.env` de la machine, et la clé d'enrôlement ─────────────────────
+# `SENTINEL_ENROLL_KEY` permet d'inscrire un FAUX agent sur le serveur central.
+# Elle ne vient jamais du dépôt ni de l'inventaire : elle vit dans le `.env` de
+# la machine (`RULES` § 4). Le rôle pose des permissions, pas des valeurs.
+- name: Lire le `.env` de la machine
+  ansible.builtin.slurp:
+    src: "{{ sentinel_server_env_file }}"
+  register: sentinel_server_env_brut
+  become: true
+  failed_when: false
+  changed_when: false
+  no_log: true
+
+- name: Établir l'état du `.env` — présent / absent / illisible
+  ansible.builtin.set_fact:
+    # Le test porte sur la présence de la clé `content`, pas sur `.failed` :
+    # avec `failed_when: false`, `.failed` vaut toujours faux, y compris quand
+    # le module n'a rien pu lire (roles/GABARIT.md § 5).
+    sentinel_server_env_etat: >-
+      {{ 'lisible' if 'content' in sentinel_server_env_brut else 'absent ou illisible' }}
+
+- name: La clé d'enrôlement est présente dans le `.env` de la machine
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_env_etat == 'lisible'
+      - (sentinel_server_env_brut.content | b64decode)
+        is search('(?m)^\s*SENTINEL_ENROLL_KEY\s*=\s*\S+')
+    fail_msg: >-
+      SENTINEL_ENROLL_KEY est absente ou vide dans {{ sentinel_server_env_file }}
+      (état du fichier : {{ sentinel_server_env_etat }}). Ce rôle NE POURSUIT PAS :
+      un serveur central posé sans secret d'enrôlement accepterait des agents
+      sans les authentifier, ou n'en accepterait aucun — dans les deux cas un
+      faux vert. Marche à suivre : copier .env.example vers
+      {{ sentinel_server_env_file }} sur la machine, y poser la clé (générée,
+      jamais recopiée d'ailleurs), mode 0600, propriétaire root. La valeur ne
+      passe NI par le dépôt, NI par l'inventaire, NI par un -e.
+    quiet: true
+  no_log: true  # le message ne doit pas emporter le contenu du fichier
+
+# ── 7. Le mode tournoi — trois états, jamais deux ──────────────────────────
+- name: Lire le témoin de mode tournoi (posé par HQ, jamais par nous)
+  ansible.builtin.stat:
+    path: "{{ hq_tournament_mode_file }}"
+  register: sentinel_server_temoin_tournoi
+  become: true
+  failed_when: false
+  changed_when: false
+
+- name: Établir l'état du mode tournoi — actif / inactif / inconnu
+  ansible.builtin.set_fact:
+    sentinel_server_mode_tournoi: >-
+      {{
+        'inconnu' if ('stat' not in sentinel_server_temoin_tournoi)
+        else ('actif' if sentinel_server_temoin_tournoi.stat.exists else 'inactif')
+      }}
+
+# ── 8. Ouvrir la liste des points signalés et non joués ────────────────────
+- name: Ouvrir la liste des points signalés mais non joués
+  ansible.builtin.set_fact:
+    sentinel_server_points_signales: []

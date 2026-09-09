@@ -2,8 +2,8 @@
 
 > **État au 2026-09-07 : dépôt amorcé, cadrage répondu (30/30), rien n'est installé
 > ni armé.** Aucune machine du parc ne porte quoi que ce soit de ce dépôt.
-> **`ADR-002` et `ADR-003` sont *Acceptées*** (2026-09-07) : `P1` et l'écriture de
-> l'exécuteur sont débloquées. `ADR-001` reste *Proposé* (`P00.2`). Le contrat de
+> **Les trois ADR sont *Acceptées*** (2026-09-07) : `P1` et l'écriture de
+> l'exécuteur sont débloquées ; `ADR-001` a été acceptée en `P00.2`. Le contrat de
 > frontière est en vigueur **côté Sentinelle seulement** — son jumeau reste à
 > porter dans HQ (`P00.5`), et sans lui il n'engage personne.
 
@@ -14,10 +14,33 @@
 8 blocs) a reçu les réponses du PO le **2026-09-07**. Les quatre STRUCTURANTES
 sont tranchées et consignées ci-dessous § « Réponses au cadrage ».
 
-**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus) : `P00.6` — tant que
-l'amorce n'est pas sur `main`, aucune branche n'a de base, et rien ne fusionne.
-Ensuite : `P00.7`, `P00.8`, `P00.2`, `P01.7` (`cursor`) · `P01.6` puis `P01.0`
-(`claude`) · **porter le jumeau du contrat dans HQ** (`P00.5`, dernière moitié).
+**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus), au **2026-09-09** :
+l'amorce est sur `main`, les quatre lots de `cursor` de la vague 0/1 sont rendus
+et **acceptés en revue**.
+
+`claude` a ensuite enchaîné **six lots sur une seule branche**, sur consigne du
+PO, pour une PR unique : `P01.6` (gabarit + `00_check`), `P01.0` (serveur
+central), `P01.4` (bornage + interlock), `P03.6` (les quatre gestes), `P03.1`
+(relais) et `P02.2` (moteur de bruit). **Aucun n'est coché** — ils attendent le
+vert de la CI sur la PR.
+
+Ce qui part maintenant : **`P01.2`** (`cursor` — elle ne dépend que de `P00.2`,
+faite : elle n'attend ni le gabarit ni le rôle serveur) · **porter le jumeau du
+contrat dans HQ** (`P00.5`, dernière moitié — dépôt tiers).
+
+**Six questions attendent le PO** — aucune ne bloque `cursor`, toutes bloquent
+un armement : `P00.11` et `P00.12` (la garde `garde-armement` ne voit pas
+`yes` / `on`, mesuré ; et elle n'est pas obligatoire à la fusion) · `P01.10`
+(le mineur du moteur décide de la source de `D4`, **bloque `P01.9`**) ·
+`P03.7` (liste des conteneurs non arrêtables) · `P03.8` (la quarantaine refuse
+l'arborescence de HQ, conformément au contrat — et c'est gênant) · `P03.9`
+(confirmer l'enveloppe de réponse active).
+
+Deux prérequis sont posés **dans le code** et refusent de s'exécuter tant qu'ils
+ne sont pas levés : l'empreinte de la clé du dépôt de paquets
+(`sentinel_server_repo_key_confirmee`) et le chemin de l'état de la relève
+(`hq_failover_state_confirme`). Les deux se lèvent en relevant un fait, pas en
+décidant.
 
 **Le lancement est cadré** : découpage en lots, affectation et ordre des vagues
 dans [`docs/plans/P02`](../docs/plans/P02-lancement-implementation.md) ; briefs
@@ -49,7 +72,7 @@ documenté par un runbook.
 | Agent sur `patator-standby` | absent | `P1` |
 | Serveur central | absent | `P1` — hôte **tranché** : `patator-standby` frugal |
 | Alerte Discord + push | non câblée | `P2` |
-| Réponse à blanc | non — noyau livré, aucun geste câblé | `P3` |
+| Réponse à blanc | non — noyau **et** quatre gestes écrits, relais écrit ; **rien n'est installé sur une machine**, `SENTINEL_RESPONSE_ENABLED` reste `false` | `P3` |
 | Réponse armée | non | `P3` |
 | Agent sur `AEGIS-TOWER` | absent | `P4` |
 

@@ -143,6 +143,118 @@ constaté que « ça ne marche pas ».
 écrit une entrée `degel` dans le journal ; c'est cette entrée qui remet le
 compteur à zéro. Le motif est obligatoire.
 
+## Ansible — quatre faux verts, mesurés en écrivant le gabarit (`P01.6`)
+
+### `-e var=false` arme au lieu de désarmer
+
+*2026-09-09.* La forme `ansible-playbook … -e sentinel_agent_enabled=false` passe
+la **chaîne** `"false"`, et une chaîne non vide est **vraie** en Jinja. La
+commande tapée pour désarmer arme. Le runbook d'armement s'écrira sur ce piège.
+
+**Implication** : tout rôle affirme `... is boolean` en préconditions
+(`roles/gabarit/tasks/00_garde.yml`), et la forme correcte est JSON :
+`-e '{"sentinel_agent_enabled": true}'`.
+
+### Avec `failed_when: false`, `.failed` ne dit plus rien
+
+*2026-09-09.* Motif tentant pour lire un témoin sans planter :
+`stat` + `failed_when: false`, puis tester `resultat.failed`. Il vaut **toujours
+faux**, y compris quand le module n'a rien pu lire et n'a donc rien renvoyé. On
+conclut alors « fichier absent » sur une mesure qui n'a pas eu lieu — le faux
+vert, écrit à la main.
+
+**Implication** : le test porte sur la **présence de la clé** `stat`
+(`'stat' not in resultat` → `inconnu`), jamais sur `.failed`. Vérifié sur les
+trois cas (témoin présent / absent / module muet).
+
+### `ignore_unreachable: true` rend `0` sur zéro machine
+
+*2026-09-09.* Nécessaire ici — `patator-standby` perd son IPv4 — mais si **tous**
+les nœuds sont injoignables, le playbook se termine avec le code `0`. Il n'a rien
+contrôlé et le dit vert.
+
+**Implication** : `00_check.yml` se termine par un play `localhost` qui **refuse
+de conclure** si l'ensemble atteint est vide, et nomme les nœuds restés
+`INCONNU`. Un play qui vise un groupe **vide**, lui, n'exécute aucune tâche : le
+seul endroit qui peut le voir est la **garde de cible**, en amont.
+
+### `\'` dans une chaîne Jinja : la tâche ne se charge même pas
+
+*2026-09-09.* Le français est plein d'apostrophes, et l'écrire `d\'ADR-003` dans
+une chaîne Jinja **simple-quotée** paraît naturel. Ça ne l'est pas : le moteur de
+templating d'Ansible coupe la chaîne à l'apostrophe et rend
+`expected token ',', got 'ADR'`. La tâche **ne se charge pas** — ce n'est pas une
+erreur d'exécution mais une erreur de chargement, qui peut se présenter comme un
+`internal-error: A malformed block was encountered` attribué à un **autre
+fichier** que celui qui la porte.
+
+**Ce qui rend le piège coûteux** : `jinja2` seul **accepte** `\'` — donc un
+contrôle local qui se contente de compiler les expressions passe au vert. C'est
+ce qui est arrivé : 193 expressions compilées localement, 4 fichiers cassés en CI.
+
+**Implication** : écrire les chaînes Jinja en **guillemets doubles** dès qu'elles
+contiennent une apostrophe, ce qui est la règle plutôt que l'exception en
+français. Le gabarit a été corrigé en premier — il se recopie.
+
+### `ansible-lint` ne s'installe pas sur le poste Windows du PO
+
+*2026-09-09.* Conflit de dépendances irrésoluble (`ansible-core` n'a pas de roue
+Windows). Conséquence : **`ansible-lint` ne se joue qu'en CI**, et un lot Ansible
+ne peut donc pas être annoncé vert avant que la PR ait tourné.
+
+**Implication** : ne pas cocher un lot Ansible sur des vérifications locales
+seules, et le dire dans la PR plutôt que de laisser croire à une vérification
+complète. `yamllint`, lui, s'installe et tourne — il attrape la forme, pas la
+sémantique Ansible.
+
+### La garde CI d'armement ne voit pas `yes`
+
+*2026-09-09.* Mesuré sur `5ce90c0` : `sentinel_response_enabled: yes`,
+`... : True`, `... : on` et `sentinel_response_dry_run: no` ajoutés dans
+`infra/ansible/` passent `garde-armement.sh` en **vert**. Le motif ne connaît que
+`true` / `false` littéraux, alors que `yes` est l'idiome Ansible courant.
+
+**Implication** : lot `P00.11`. En attendant, le gabarit impose `false` littéral
+dans `defaults/` — et la garde CI reste la ceinture, pas les bretelles.
+
+## L'exécuteur — trois pièges relevés en câblant les gestes (`P03.6`)
+
+### `is_private` de Python ne protège pas le tailnet de façon stable
+
+*2026-09-09.* Première version de `bloquer_ip` : refuser les adresses privées
+avec `adresse.is_private`. Défaut mesuré — **la plage du tailnet
+(`100.64.0.0/10`) n'y est pas classée de la même façon selon la version de
+Python**, et `is_private` couvre par ailleurs les plages de documentation
+(`203.0.113.0/24`), que rien n'oblige à protéger.
+
+**Implication** : le chemin d'administration du parc dépendait du hasard d'une
+mise à jour d'interpréteur. Les plages protégées sont désormais **nommées une par
+une**, avec leur motif, dans `PLAGES_PROTEGEES`. Une garde qui protège le chemin
+du retour ne se délègue pas à une propriété de bibliothèque.
+
+### Un geste qui échoue ne laissait aucune trace
+
+*2026-09-09.* `P03.0` appelait le geste câblé puis journalisait `execute`. Si le
+geste levait, l'exception s'échappait de `traiter()` : **ni geste, ni refus, ni
+ligne au journal**. On croyait la menace traitée, et la tentative ne consommait
+pas le budget — donc elle se rejouait sans fin.
+
+**Implication** : résultat `echoue`, distinct de `refuse` (refuser, c'est décider
+de ne pas agir ; échouer, c'est avoir essayé sans aboutir), et **consommateur de
+budget**. Une tentative reste une tentative.
+
+### Le catalogue se contourne en changeant de nom de geste
+
+*2026-09-09.* Arrêter le conteneur `cloudflared` **est** `couper_connecteur` —
+classé *alerte* en nominal, *jamais* en tournoi. Rien n'empêchait un ordre
+`arreter_conteneur` de cible `cloudflared` de le jouer quand même. Le catalogue
+fermé cessait d'être fermé, sans qu'une ligne de `catalogue.py` ait bougé.
+
+**Implication** : chaque geste porte la liste de ce sur quoi il refuse d'agir, et
+cette liste se lit comme une **conséquence du catalogue**, pas comme une
+préférence. À généraliser : avant de câbler un geste, se demander *quel autre
+geste du catalogue celui-ci permettrait de jouer par un autre nom*.
+
 ## Contraintes de ressources
 
 - Serveur central en profil frugal : **0,7 à 1,2 Go** de RAM. Le profil complet

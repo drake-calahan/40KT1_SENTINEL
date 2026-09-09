@@ -1,0 +1,36 @@
+---
+# Bilan de fin de rôle `gabarit` — portée : L'HÔTE COURANT.
+#
+# Le bilan de PLAY (le nombre d'hôtes réellement touchés) est une autre chose,
+# et il vit dans le playbook : voir `playbooks/00_check.yml` et
+# `roles/GABARIT.md` § 4. Les confondre fait perdre le seul contrôle qui
+# distingue « tout va bien » de « je n'ai regardé personne ».
+
+- name: Bilan du rôle sur cet hôte
+  ansible.builtin.debug:
+    msg:
+      - "hôte             : {{ inventory_hostname }}"
+      - "rôle             : gabarit"
+      - "armement         : {{ 'ARMÉ' if gabarit_enabled | bool else 'désarmé (défaut du dépôt)' }}"
+      - "unité gérée      : {{ gabarit_unite }}"
+      - "configuration    : {{ gabarit_config_file }}"
+      - "mode tournoi (HQ): {{ gabarit_mode_tournoi }}"
+      - "points signalés  : {{ gabarit_points_signales | length }}"
+
+# Ce qui a été REFUSÉ est la partie du bilan qui compte. Un rôle qui se tait
+# sur ce qu'il n'a pas joué laisse croire qu'il a tout fait.
+- name: Points signalés et NON joués — à reprendre par un humain
+  ansible.builtin.debug:
+    msg: "SIGNALÉ, NON JOUÉ — {{ item }}"
+  loop: "{{ gabarit_points_signales }}"
+  when: gabarit_points_signales | length > 0
+
+# Le mode tournoi inconnu ressort au bilan et pas seulement en préconditions :
+# une exécution longue se lit par la fin, et un « inconnu » vu au début a
+# disparu de l'écran.
+- name: Rappeler qu'un état est resté inconnu
+  ansible.builtin.debug:
+    msg: >-
+      INCONNU au terme de ce rôle : le mode tournoi de HQ n'a pas pu être lu
+      ({{ hq_tournament_mode_file }}). Aucune conclusion ne s'en tire.
+  when: gabarit_mode_tournoi == 'inconnu'

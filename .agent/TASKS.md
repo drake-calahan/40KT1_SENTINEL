@@ -38,12 +38,37 @@ partie, toujours.**
 > `ADR-002` et `ADR-003` sont *Acceptées*. `P00.5` est à moitié faite : le jumeau
 > du contrat reste à porter dans `40KT1_HQ`.
 >
-> **Ensuite, en parallèle** : `P00.7`, `P00.8`, `P00.2`, `P01.7` (`cursor`) ·
-> `P01.6` puis `P01.0` (`claude`).
+> **2026-09-09 — revue de `claude`.** Les quatre lots rendus par `cursor`
+> (`P00.7`, `P00.8`, `P00.2`, `P01.7`) sont **acceptés**. Deux corrections de
+> revue ont été portées, aucune fonctionnelle : le statut réel d'`ADR-001` (cinq
+> phrases du dépôt affirmaient encore *Proposé*) et la porte des `indeterminee`
+> au critère de sortie de la phase 1. Deux suites sont **ouvertes**, décrites
+> plus bas en « Suites de revue ».
 >
-> **Plus bloqué** : les rôles Ansible le sont — `ADR-003` est *Acceptée*. Ce qui
-> bloque encore, c'est `P00.6` : sans amorce sur `main`, aucune branche n'a de
-> base.
+> **2026-09-09, seconde partie — six lots enchaînés sur une seule branche.**
+> Sur instruction explicite du PO (« enchaîne le maximum sur cette branche, on
+> fera une grosse PR »), `claude` a livré `P01.6`, `P01.0`, `P01.4`, `P03.6`,
+> `P03.1` et `P02.2` sur `claude/cursor-work-review-2f7ede`.
+>
+> Six `[~]` pour un même agent **dérogent à « une tâche à la fois »**, et c'est
+> écrit ici plutôt que passé sous silence. Ce que la règle protège — la
+> collision avec `cursor` — n'est pas en cause : aucun de ces lots ne touche une
+> zone de `cursor` (`rules/`, `scripts/`, `roles/sentinel_agent/`). Ce qui
+> disparaît, en revanche, c'est le **grain de revue** : une PR de ~5 500 lignes
+> se relit moins bien que six. C'est le coût assumé de la consigne, et il vaut
+> d'être connu au moment de relire.
+>
+> **Aucun de ces six ne se coche avant le vert de la CI sur la PR.**
+>
+> **La suite, en parallèle** :
+> - `cursor` → **`P01.2`** (règles d'intégrité). Elle ne dépend **que** de
+>   `P00.2`, qui est faite : elle part **maintenant**, sans attendre le gabarit
+>   ni le rôle serveur — `rules/` et `infra/ansible/` sont deux zones
+>   distinctes ([`P02`](../docs/plans/P02-lancement-implementation.md) § 6).
+> - `claude` → `P01.6` (en cours), puis `P01.0`.
+>
+> **Plus bloqué** : plus rien côté décisions — les trois ADR sont *Acceptées* et
+> l'amorce est sur `main`.
 
 - [x] **P00.0** Amorce du dépôt : harnais `.agent/`, couche Cursor, hub docs,
       trois ADR au statut *Proposé*, plan `P01`, contrat de frontière avec HQ,
@@ -74,12 +99,39 @@ partie, toujours.**
       geste par geste (4 armés / 4 alerte / 1 jamais), « invisible pour l'équipe »
       défini, budget en **trois états** avec dégel humain, et les **cinq portes
       de l'armement** (§ 6) qui cadrent `P03.4`. Débloque `P03.0`.
-- [~] **P00.5** (claude, 2026-09-07) Contrat de frontière : côté Sentinelle
+- [~] **P00.5** (claude, 2026-09-07) — **en attente d'un dépôt tiers, pas en
+      cours ici** : le texte est prêt, la suite est une PR dans `40KT1_HQ`. Ce
+      `[~]` ne consomme donc pas le « une tâche à la fois » de `claude`.
+      Contrat de frontière : côté Sentinelle
       **fait** (relève et chaîne de blocage ajoutées à la liste d'objets, trois
       engagements de HQ explicités) ; le **jumeau reste à porter** dans
       `40KT1_HQ` — texte prêt dans
       [`docs/contrat-hq-jumeau.md`](../docs/contrat-hq-jumeau.md). **Ce lot ne se
       coche qu'à la fusion de la PR dans HQ**, pas à son ouverture.
+
+## Suites de revue — ouvertes le 2026-09-09
+
+> Deux constats de la revue des lots de `cursor`. Aucun n'est un défaut de
+> livraison : les deux lots sont conformes à leur brief. Ce sont des **trous
+> dans les briefs**, et ils se referment ici plutôt que dans une discussion.
+
+- [ ] **P00.11** (cursor) Garde `garde-armement` : élargir aux formes booléennes
+      **équivalentes**. Le motif actuel ne reconnaît que `true` / `false`
+      littéraux. Mesuré le 2026-09-09 sur `5ce90c0` : les quatre lignes
+      `sentinel_response_enabled: yes`, `sentinel_agent_enabled: True`,
+      `sentinel_bloc_enabled: on` et `sentinel_response_dry_run: no` ajoutées
+      dans `infra/ansible/` passent la garde en **vert**. Or `yes` est l'idiome
+      Ansible le plus courant : c'est exactement le mode de panne que le brief
+      `P00.8` nommait (« un rôle qui pose `..._enabled: true` dans ses
+      `defaults` »), et il passe. Étendre le motif à
+      `true|yes|on|True|Yes|On` (et `false|no|off|…` pour `dry_run`), guillemets
+      optionnels, puis **rejouer les quatre cas d'acceptation du brief `P00.8`**.
+      *Le gabarit `P01.6` impose déjà `false` littéral côté rôle ; cette garde
+      est la ceinture, pas les bretelles.*
+- [ ] **P00.12** (PO) Rendre `garde-armement` **obligatoire** dans le ruleset
+      `main-protection`, aux côtés des trois workflows de `P00.6`. Un contrôle
+      qui échoue mais ne bloque pas la fusion est un avis, pas une garde — et
+      `RULES` § 1 ne demande pas un avis. **Geste d'exploitation : PO.**
 
 ## Phase 1 — Observation seule
 
@@ -91,13 +143,46 @@ partie, toujours.**
       protocole et journal des faux positifs, avec le troisième état
       `indeterminee` — [brief](briefs/P01.7-instrumentation-observation.md).
       *Non bloqué par `ADR-003` : aucun fichier de machine.*
-- [ ] **P01.6** (claude) **Gabarit de rôle Ansible** : disposition, garde
-      `*_enabled`, politique « aucun redémarrage d'un service de HQ », bilan de
-      fin de rôle avec le nombre d'hôtes touchés, playbook `00_check.yml`,
-      groupe `sentinel_server` rempli dans l'inventaire.
-- [ ] **P01.0** (claude) Rôle `sentinel_server` — serveur central sur l'hôte
-      tranché en `C1`, **profil frugal** (pas d'indexeur, pas de console).
-      Écoute sur `tailscale0` uniquement.
+- [~] **P01.6** (claude, 2026-09-09) **Gabarit de rôle Ansible** :
+      [`roles/GABARIT.md`](../infra/ansible/roles/GABARIT.md) (le contrat) +
+      [`roles/gabarit/`](../infra/ansible/roles/gabarit/) (le squelette à
+      copier) ; garde `*_enabled` **de type** (une chaîne `"false"` est vraie en
+      Jinja) ; politique « aucun redémarrage d'un service de HQ » rendue
+      mécanique par affirmation du préfixe `sentinel-` dans le handler ; bilan
+      de rôle **et** bilan de play ; **garde de cible** contre le play qui vise
+      zéro hôte ; [`playbooks/00_check.yml`](../infra/ansible/playbooks/00_check.yml)
+      en lecture seule ; groupe `sentinel_server` rempli (`patator-standby`,
+      `ADR-003`). `yamllint` vert au réglage de la CI ; **`ansible-lint` non
+      joué en local** (non installable sur le poste Windows) — il tranche en CI.
+      Ne se coche qu'au vert de la CI sur la PR.
+- [~] **P01.0** (claude, 2026-09-09) Rôle `sentinel_server` + playbook
+      `01_server.yml` — manager seul (**profil frugal** refusé de continuer si
+      un indexeur ou une console est présent), version **épinglée par apt *et*
+      gelée** contre `unattended-upgrades`, clé de dépôt **vérifiée par
+      empreinte**, écoute `tailscale0` résolue depuis les faits et **mesurée par
+      `ss -lntp` à l'armement**, désinstallation jouable (état conservé, sa
+      purge est un geste séparé). Livré **désarmé** : `policy-rc.d` empêche le
+      paquet de démarrer son service à l'installation. Trois refus durs
+      d'armement — témoin de désarmement posé **ou illisible**, bornage `P01.4`
+      absent, écoute hors tailnet. Ne se coche qu'au vert de la CI **et** après
+      un `--check --diff` réel sur la machine.
+      ⚠️ **Deux prérequis avant le premier `--check`** : confirmer l'empreinte
+      de la clé de dépôt (le rôle **refuse** de tourner tant que
+      `sentinel_server_repo_key_confirmee` est `false`) et poser le `.env` avec
+      `SENTINEL_ENROLL_KEY`. Voir le [README du rôle](../infra/ansible/roles/sentinel_server/README.md).
+- [ ] **P01.10** (claude — relevé · **PO — l'arbitrage**) **`D4` et le mineur du
+      moteur.** Le détecteur de vulnérabilités de Wazuh a été redessiné au cours
+      de la série 4.x, et la version redessinée stocke ses résultats dans
+      l'**indexeur** — que le profil frugal n'installe pas (`ADR-001`). Selon le
+      mineur retenu (`4.7.5` aujourd'hui, à un seul endroit :
+      `sentinel_server_wazuh_version`), le rapport hebdomadaire de
+      vulnérabilités de `D4` est soit produisible localement, soit à produire
+      autrement. **Ce point n'est pas vérifié** — il est ouvert ici parce qu'il
+      se découvrirait sinon au milieu de `P01.9`, moteur déjà posé sur une
+      machine de production et version gelée. Relever le comportement réel,
+      puis trancher : rester sur un mineur qui s'en passe · produire `D4`
+      autrement en lecture seule · rouvrir `ADR-001` sur le profil.
+      **Bloque `P01.9`**, pas `P01.1`.
 - [ ] **P01.2** (cursor) Règles d'intégrité (`rules/integrite/`) sur la liste
       courte de `D1` — [brief](briefs/P01.2-regles-integrite.md). Fixe les plages
       d'identifiants et la correspondance sévérité ↔ niveau pour tous les lots de
@@ -109,14 +194,32 @@ partie, toujours.**
 - [ ] **P01.8** (cursor) Règles authentification et événements Docker —
       [brief](briefs/P01.8-regles-auth-docker.md).
 - [ ] **P01.3** (claude) Règle **anti-rafale** pour la perte de contact d'un
-      agent — écrite **avant** le premier week-end, pas après. Motif : le défaut
-      réseau récidivant de `patator-standby` (4 occurrences connues). Livre le
-      noyau du moteur de bruit, généralisé en `P02.2`.
-- [ ] **P01.4** (claude) Bornage des ressources (`cgroup`) et, l'hôte étant le
-      standby, arrêt automatique du serveur central quand la relève s'arme (`C3`).
+      agent. **Le noyau est livré** (`bruit/`, voir `P02.2`) et le cas du standby
+      est rejoué en test : 6 h de panne sondée à la minute → **25 alertes au lieu
+      de 360**, et les quatre épisodes connus restent quatre ouvertures
+      distinctes. **Reste à câbler la règle de détection elle-même**
+      (`rules/agents/`) sur la sonde de contact — cela demande un agent qui
+      existe, donc `P01.1`.
+- [~] **P01.4** (claude, 2026-09-09) Rôle `sentinel_bornage` — les deux
+      conditions vérifiables d'`ADR-003`, avec deux régimes **différents** :
+      le **plafond** `cgroup` est une contrainte (posé sans garde, appliqué à
+      chaud sans redémarrer, puis **relu par `systemctl show`** — le rôle échoue
+      si `MemoryMax` revient à `infinity`, car un drop-in sans `daemon-reload`
+      est un fichier et pas une limite) ; l'**interlock** de relève est un
+      automate, donc **livré désarmé**. Trois états testés : relève armée →
+      arrêt · au repos → silence · **inconnu → `signaler` par défaut**, parce
+      qu'agir sur une mesure non prise est ce que `RULES` § 1 interdit et que le
+      plafond borne déjà le risque. Ne se coche qu'au vert de la CI **et** après
+      un `--check --diff` réel.
+      ⚠️ **Armement de l'interlock bloqué** par `hq_failover_state_confirme:
+      false` : le contrat de frontière nomme l'objet « état de la relève » mais
+      pas le fichier qui le porte (`scripts/failover.py` / `ADR-061`, côté HQ).
+      Le chemin actuel est une hypothèse. **Se confirme avec `P00.5`.**
 - [ ] **P01.9** (cursor) Rapports hebdomadaires conformité (`D3`) et
       vulnérabilités (`D4`), **lecture seule**, unités `sentinel-*` livrées
       désarmées — [brief](briefs/P01.9-rapports-hebdomadaires.md).
+      ⚠️ **Bloqué par `P01.10`** : la source de `D4` dépend du mineur du moteur.
+      Ne pas démarrer ce lot avant l'arbitrage — le brief le présuppose résolu.
 - [ ] **P01.5** (PO) Période d'observation (`D5`, 14 jours) couvrant au moins un
       déploiement complet et une sauvegarde offsite. Journal des faux positifs
       tenu selon `P01.7`.
@@ -132,8 +235,20 @@ semaines de suite. Chiffré, mesuré, écrit — pas « ça a l'air calme ».
 - [ ] **P02.1** (cursor) Grille de sévérité calquée sur `watchdog.py` + la
       sévérité `critique` et ses trois cas (`F2`) —
       [brief](briefs/P02.1-grille-severite.md).
-- [ ] **P02.2** (claude) Agrégation par fenêtre de 15 min avec compteur (`F3`) —
-      généralisation du moteur de bruit livré en `P01.3`.
+- [~] **P02.2** (claude, 2026-09-09) Paquet `bruit/` — le moteur de bruit, écrit
+      **avant le premier week-end** comme `P01` l'exige, pas après. Alerte à la
+      **transition** et non à l'état ; agrégation sur fenêtre de 15 min où **le
+      compteur EST l'information** (« 143 fois en 15 min » se lit, 143 messages
+      apprennent à ignorer le canal — et c'est l'alerte *suivante* qu'on perd) ;
+      `inconnu` a ses propres transitions, et passer de `ko` à `inconnu` n'est
+      **pas** un retour à la normale ; la sévérité ne redescend jamais seule ;
+      une sévérité non reconnue est traitée comme la **plus haute** (le bruit se
+      corrige, le silence ne se remarque pas). Aucun booléen dans le paquet :
+      impossible d'y écrire « pas ko, donc ok ». Moteur **pur** — l'instant est
+      un argument, pas une horloge : les tests couvrent un week-end en 50 ms.
+      13 tests, 120 verts au total.
+      *N'envoie rien* : le câblage Discord/ntfy est `P02.0`, et sa première
+      exigence reste la preuve d'arrivée sur le téléphone.
 
 **Critère de sortie** : une alerte de test reçue sur les deux canaux, et une
 alerte réelle traitée de bout en bout.
@@ -149,11 +264,60 @@ alerte réelle traitée de bout en bout.
       **et** refus), dégel tracé. 36 tests, dont les quatre refus obligatoires et
       les cas de dégradation. `ruff` + `pytest` verts. **Aucun geste privilégié :
       rien ne peut être joué.**
-- [ ] **P03.6** (claude) Les quatre gestes armables du catalogue, chacun avec son
-      retour arrière : blocage d'IP à expiration, arrêt de processus, arrêt de
-      conteneur, mise en quarantaine d'un fichier.
-- [ ] **P03.1** (claude) Relais mince côté agent : le mécanisme de réponse active
-      de l'outil sert de transport, l'exécuteur local décide.
+- [~] **P03.6** (claude, 2026-09-09) `responder/gestes/` — les quatre gestes
+      armables, **chacun rendant la commande exacte qui le défait**, avec ses
+      valeurs, jusqu'au journal (`ADR-062` : défaire *sans arbitrage* ; laisser
+      l'exploitant retrouver la commande à 3 h du matin **est** de l'arbitrage).
+      Jamais de shell, délai sur toute commande, cible **revalidée localement**
+      (le serveur central ordonne, le nœud vérifie — `ADR-002` § 3).
+      `verifier_coherence()` interdit de câbler un geste que le catalogue ne
+      classe pas *armé*. 88 tests verts, `ruff` 0.6.9 (version CI) vert.
+      **Deux défauts corrigés au passage, tous deux dans `P03.0`** :
+      (a) un geste qui **échoue** ne laissait *aucune* entrée au journal et
+      l'exception s'échappait de `traiter()` — on croyait la menace traitée et
+      la tentative ne consommait pas le budget, donc elle se rejouait sans fin.
+      Nouveau résultat `echoue`, consommateur de budget ;
+      (b) `bloquer_ip` s'appuyait d'abord sur `is_private`, qui **ne classe pas
+      `100.64.0.0/10` — le tailnet — de la même façon selon la version de
+      Python**. Le chemin d'administration du parc dépendait d'une mise à jour
+      d'interpréteur. Plages désormais **nommées une par une**.
+- [ ] **P03.7** (PO) Confirmer la **liste des conteneurs non arrêtables**
+      (`responder/gestes/arreter_conteneur.py`). Motif : arrêter `cloudflared`
+      **est** `couper_connecteur`, classé *alerte* en nominal et *jamais* en
+      tournoi — l'autoriser rendrait exécutable un geste alerte-seulement en
+      changeant de nom de geste, et le catalogue fermé cesserait d'être fermé.
+      Même raisonnement pour `db` (la donnée), `caddy` (le nom public) et `api`
+      (la version servie), au titre de `RULES` § 2. **Rétrécir ne demande aucun
+      amendement** — c'est fait. Ce qu'il faut du PO, c'est confirmer que la
+      liste couvre bien les noms réels des conteneurs du parc.
+- [ ] **P03.8** (PO — arbitrage · claude — mise en œuvre) **Quarantaine et
+      frontière HQ.** `quarantaine_fichier` refuse tout chemin sous `/srv/40kt1`
+      ou `~/40KT1_HQ` : le contrat dit que Sentinelle les surveille **en
+      lecture** et n'y écrit pas — or déplacer un fichier hors d'un répertoire,
+      c'est y écrire. La limite est conforme et **gênante** : un fichier déposé
+      par un attaquant dans la stack est exactement ce qu'on voudrait mettre de
+      côté. Trois issues : garder le refus (alerte seule) · amender le contrat
+      **des deux côtés** pour autoriser le retrait depuis l'arborescence de HQ ·
+      restreindre l'autorisation à des sous-chemins nommés. Ne se tranche pas
+      dans un module Python.
+- [~] **P03.1** (claude, 2026-09-09) `responder/relais.py` — le mécanisme de
+      réponse active du moteur sert de **transport**, et rien d'autre. Le relais
+      **extrait** trois champs et les passe à l'exécuteur ; il ne consulte ni le
+      catalogue, ni le budget, ni le mode tournoi, ni le témoin de désarmement.
+      C'est une propriété de sécurité, pas un goût d'architecture : le relais est
+      la surface exposée au serveur central, et s'il décidait quoi que ce soit,
+      un serveur compromis déciderait avec lui. Il **n'infère jamais le geste
+      depuis la règle** — déduire, ce serait prendre la décision que le catalogue
+      porte, dans le fichier le moins relu du dépôt. Il refuse l'annulation par
+      le moteur : nos gestes portent leur propre retour arrière, tracé au
+      journal, et une annulation externe serait un second chemin invisible.
+      19 tests, presque tous sur des refus. 107 tests verts au total.
+- [ ] **P03.9** (claude) Confirmer la forme réelle de l'enveloppe de réponse
+      active **contre la version du moteur effectivement installée**
+      (`sentinel_server_wazuh_version`). `responder/relais.py` lit aujourd'hui un
+      sous-ensemble documenté et refuse ce qu'il ne comprend pas — donc il se
+      teste, mais il **ne s'arme pas**. À faire après `P01.1`, quand un agent
+      existe pour produire une vraie enveloppe. **Porte d'armement de `P03.4`.**
 - [ ] **P03.2** (cursor) Mode à blanc — runbook de lecture du journal et
       définition d'un geste injustifié —
       [brief](briefs/P03.2-runbook-mode-a-blanc.md).

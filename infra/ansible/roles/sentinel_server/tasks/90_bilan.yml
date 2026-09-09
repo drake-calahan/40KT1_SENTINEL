@@ -1,0 +1,45 @@
+---
+# Bilan du rôle `sentinel_server` — portée : l'hôte courant.
+# Le bilan de PLAY (nombre d'hôtes touchés) est dans `playbooks/01_server.yml`.
+
+- name: Bilan du serveur central sur cet hôte
+  ansible.builtin.debug:
+    msg:
+      - "hôte              : {{ inventory_hostname }}"
+      - "profil            : {{ sentinel_server_profil | default('frugal') }} — manager seul, ni indexeur ni console"
+      - "armement          : {{ 'ARMÉ' if sentinel_server_enabled | bool else 'désarmé (défaut du dépôt)' }}"
+      - "version épinglée  : {{ sentinel_server_wazuh_version }} (gelée contre unattended-upgrades)"
+      - "écoute prévue     : {{ sentinel_server_listen_ip | default('non résolue') }} ({{ sentinel_server_listen_interface | default('?') }})"
+      - >-
+        ports             : {{ sentinel_server_port_evenements }} événements ·
+        {{ sentinel_server_port_enrolement }} enrôlement ·
+        {{ sentinel_server_port_api }} API
+      - "mode tournoi (HQ) : {{ sentinel_server_mode_tournoi }}"
+      - "points signalés   : {{ sentinel_server_points_signales | length }}"
+
+# La partie du bilan qui compte : ce qui n'a PAS été joué.
+- name: Points signalés et NON joués — à reprendre par un humain
+  ansible.builtin.debug:
+    msg: "SIGNALÉ, NON JOUÉ — {{ item }}"
+  loop: "{{ sentinel_server_points_signales }}"
+  when: sentinel_server_points_signales | length > 0
+
+# En `--check`, la vérification d'écoute n'a pas pu être prise : l'unité n'a
+# pas démarré. Le dire est le point — sinon un `--check` vert laisserait croire
+# que la condition 3 d'ADR-003 est vérifiée, alors qu'elle est seulement
+# ANNONCÉE. C'est la définition du faux vert.
+- name: Rappeler qu'en --check l'écoute n'a pas été mesurée
+  ansible.builtin.debug:
+    msg: >-
+      NON MESURÉ en --check : l'écoute réelle du moteur. La condition 3
+      d'ADR-003 (tailnet uniquement) n'est vérifiée QU'À L'ARMEMENT, par
+      `ss -lntp`, sur la machine. Un --check vert ne la démontre pas.
+  when: ansible_check_mode
+
+- name: Rappeler qu'un état est resté inconnu
+  ansible.builtin.debug:
+    msg: >-
+      INCONNU au terme de ce rôle : le mode tournoi de HQ n'a pas pu être lu
+      ({{ hq_tournament_mode_file }}). Aucune conclusion ne s'en tire — ce
+      n'est pas « pas de tournoi ».
+  when: sentinel_server_mode_tournoi == 'inconnu'

@@ -1,0 +1,68 @@
+---
+# Préconditions du rôle `sentinel_bornage`.
+
+- name: La garde de l'interlock est un booléen, pas une chaîne
+  ansible.builtin.assert:
+    that:
+      - sentinel_bornage_interlock_enabled is defined
+      - sentinel_bornage_interlock_enabled is boolean
+    fail_msg: >-
+      « sentinel_bornage_interlock_enabled » n'est pas un booléen
+      ({{ sentinel_bornage_interlock_enabled | default(None) | type_debug }}).
+      Une chaîne non vide est VRAIE en Jinja. Forme correcte :
+      -e '{"sentinel_bornage_interlock_enabled": true}'.
+    quiet: true
+
+- name: Le comportement sur état inconnu est une valeur connue
+  ansible.builtin.assert:
+    that:
+      - sentinel_bornage_interlock_sur_inconnu in sentinel_bornage_sur_inconnu_valides
+    fail_msg: >-
+      « sentinel_bornage_interlock_sur_inconnu » vaut
+      « {{ sentinel_bornage_interlock_sur_inconnu }} », qui n'est pas dans
+      {{ sentinel_bornage_sur_inconnu_valides | join(' / ') }}. Un comportement
+      face à l'inconnu ne se laisse pas au défaut d'un script : il se choisit.
+    quiet: true
+
+# ── Le plafond doit être NON VIDE et plausible ─────────────────────────────
+# Un `MemoryMax` vide se rend en systemd par « infinity » : le plafond
+# existerait dans le dépôt et pas sur la machine. C'est la forme exacte du faux
+# vert qu'ADR-003 nomme quand il exige une condition VÉRIFIABLE plutôt que
+# déclarative.
+- name: Les valeurs de plafond sont posées
+  ansible.builtin.assert:
+    that:
+      - sentinel_bornage_memory_max | length > 0
+      - sentinel_bornage_memory_high | length > 0
+      - sentinel_bornage_cpu_quota | length > 0
+      - sentinel_bornage_memory_max is match('^[0-9]+[KMGT]?$')
+      - sentinel_bornage_cpu_quota is match('^[0-9]+%$')
+    fail_msg: >-
+      Un plafond est vide ou mal formé (mémoire
+      « {{ sentinel_bornage_memory_max }} » / « {{ sentinel_bornage_memory_high }} »,
+      CPU « {{ sentinel_bornage_cpu_quota }} »). Un MemoryMax vide se rend en
+      « infinity » : le plafond existerait dans le dépôt et pas sur la machine.
+      ADR-003 exige une condition vérifiable, pas déclarative.
+    quiet: true
+
+# ── L'interlock ne s'arme pas sur un chemin deviné ─────────────────────────
+- name: L'état de la relève est un chemin confirmé avant d'armer l'interlock
+  ansible.builtin.assert:
+    that:
+      - hq_failover_state_confirme | bool
+    fail_msg: >-
+      ARMEMENT DE L'INTERLOCK REFUSÉ : le chemin de l'état de la relève
+      ({{ hq_failover_state_file }}) n'est pas confirmé
+      (hq_failover_state_confirme = false). Le contrat de frontière nomme
+      l'objet, pas le fichier — ce mécanisme vit dans `scripts/failover.py` et
+      `ADR-061`, côté HQ. Un automate qui ARRÊTE le serveur de sécurité en se
+      fondant sur un chemin deviné est pire que pas d'interlock : il
+      s'arrêterait au hasard, ou jamais, sans qu'on sache lequel. Confirmer le
+      chemin en portant le jumeau du contrat dans HQ (P00.5), le consigner des
+      DEUX côtés, puis armer.
+    quiet: true
+  when: sentinel_bornage_interlock_enabled | bool
+
+- name: Ouvrir la liste des points signalés mais non joués
+  ansible.builtin.set_fact:
+    sentinel_bornage_points_signales: []

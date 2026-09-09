@@ -11,7 +11,7 @@ Point d'entrée unique. Une intention par porte.
 | Porte | Pour qui | Intention |
 |-------|----------|-----------|
 | [Cadrage](cadrage/) | PO | Répondre aux 30 questions qui débloquent le chantier |
-| [Décisions](adr/) | Architecte, revue | ADR — `002` et `003` *Acceptées*, `001` encore *Proposé* |
+| [Décisions](adr/) | Architecte, revue | ADR — `001`, `002` et `003` *Acceptées* (2026-09-07) |
 | [Plans](plans/) | PO, agents | `P01` — mise en service, phases P0 → P4 · `P02` — découpage et affectation des lots |
 | [Runbooks](runbooks/) | Ops | Procédures — **aucune n'est jouable aujourd'hui** |
 | [Contrat HQ](contrat-hq.md) | Architecte, ops | Frontière de propriété avec `40KT1_HQ` |

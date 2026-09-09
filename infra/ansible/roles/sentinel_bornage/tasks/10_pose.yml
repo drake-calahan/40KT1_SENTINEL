@@ -1,0 +1,113 @@
+---
+# Pose du bornage et de l'interlock.
+#
+# Le PLAFOND se pose toujours — c'est une contrainte, pas un geste.
+# L'INTERLOCK se pose désarmé — unité et timer installés, ni activés ni démarrés.
+
+# ══ CONDITION 1 — le plafond, permanent et inconditionnel ═════════════════
+# systemd applique les limites d'un cgroup À CHAUD après `daemon-reload` :
+# poser ce plafond ne demande PAS de redémarrer le moteur. C'est ce qui permet
+# à ce rôle d'être rejoué sur une machine en production sans rien redémarrer —
+# la règle de `host_baseline` dans HQ, et elle vaut ici (docs/contrat-hq.md).
+- name: Créer le répertoire de surcharge de l'unité bornée
+  ansible.builtin.file:
+    path: "{{ sentinel_bornage_dropin_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Poser le plafond de ressources du serveur central
+  ansible.builtin.template:
+    src: sentinel-bornage.conf.j2
+    dest: "{{ sentinel_bornage_dropin }}"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: recharger le gestionnaire de services
+
+# Le plafond doit être appliqué MAINTENANT, pas au prochain handler : le rôle
+# `sentinel_server` refuse de s'armer sans lui, et un plafond posé mais non
+# rechargé est un fichier, pas une limite.
+- name: Appliquer le plafond immédiatement
+  ansible.builtin.meta: flush_handlers
+
+# ══ CONDITION 2 — l'interlock, posé désarmé ═══════════════════════════════
+- name: Créer le répertoire des exécutables de Sentinelle
+  ansible.builtin.file:
+    path: "{{ sentinel_install_dir }}/bin"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+
+- name: Poser le script d'interlock de relève
+  ansible.builtin.template:
+    src: sentinel-interlock-releve.sh.j2
+    dest: "{{ sentinel_bornage_interlock_script }}"
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+
+- name: Poser l'unité et le timer de l'interlock
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - "{{ sentinel_bornage_interlock_unite }}"
+    - "{{ sentinel_bornage_interlock_timer }}"
+  become: true
+  notify: recharger le gestionnaire de services
+
+# Rendre l'unité visible à `systemctl status` sans l'activer. Recharger ne
+# démarre rien — c'est précisément ce qui permet à un `--check` de montrer ce
+# que l'armement fera, avant que quiconque l'arme.
+- name: Recharger le gestionnaire de services sans rien démarrer
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+- name: S'assurer que l'interlock n'est ni activé ni démarré
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - "{{ sentinel_bornage_interlock_timer }}"
+    - "{{ sentinel_bornage_interlock_unite }}"
+  become: true
+  when: not (sentinel_bornage_interlock_enabled | bool)
+
+# ── Ce qu'on signale sans le jouer ────────────────────────────────────────
+- name: Signaler que l'interlock est posé mais désarmé
+  ansible.builtin.set_fact:
+    # Chaînes Jinja en GUILLEMETS DOUBLES : le français est plein d'apostrophes,
+    # et `\'` dans une chaîne Jinja simple-quotée n'est pas l'échappement qu'on
+    # croit — le lexer coupe la chaîne à l'apostrophe et la tâche ne se charge
+    # même pas. Mesuré en CI le 2026-09-09.
+    sentinel_bornage_points_signales: >-
+      {{ sentinel_bornage_points_signales + [
+           "Interlock de relève POSÉ mais DÉSARMÉ (condition 2 d'ADR-003). "
+           ~ "Le plafond, lui, est actif — la condition 1 ne dépend pas de "
+           ~ "l'interlock. Armer : geste d'exploitation, après confirmation "
+           ~ "du chemin de l'état de la relève côté HQ (P00.5)."
+         ] }}
+  when: not (sentinel_bornage_interlock_enabled | bool)
+
+- name: Signaler un chemin d'état de relève non confirmé
+  ansible.builtin.set_fact:
+    sentinel_bornage_points_signales: >-
+      {{ sentinel_bornage_points_signales + [
+           "Chemin de l'état de la relève NON CONFIRMÉ ("
+           ~ hq_failover_state_file ~ "). Hypothèse calquée sur le témoin de "
+           ~ "mode tournoi. À relever côté HQ et à consigner des DEUX côtés — "
+           ~ "une frontière écrite d'un seul côté n'est pas une frontière."
+         ] }}
+  when: not (hq_failover_state_confirme | bool)

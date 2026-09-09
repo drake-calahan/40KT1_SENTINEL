@@ -1,0 +1,44 @@
+---
+# Orchestration du rôle `sentinel_server`, et rien d'autre (roles/GABARIT.md § 1).
+
+# La désinstallation court-circuite tout le reste : elle ne « pose » pas, elle
+# retire. La mêler au flux normal produirait un rôle qui installe et désinstalle
+# dans la même exécution selon un drapeau — illisible, donc dangereux.
+- name: Désinstallation — geste explicite, jamais le défaut
+  ansible.builtin.include_tasks: 99_desinstallation.yml
+  when: sentinel_server_desinstaller | bool
+  tags:
+    - sentinel_server
+    - sentinel_server_desinstallation
+
+- name: Préconditions — ce qui doit être vrai avant de poser quoi que ce soit
+  ansible.builtin.include_tasks: 00_garde.yml
+  when: not (sentinel_server_desinstaller | bool)
+  tags:
+    - sentinel_server
+    - sentinel_server_garde
+    - always
+
+- name: Pose — dépôt, paquet épinglé, configuration ; rien n'est démarré
+  ansible.builtin.include_tasks: 10_pose.yml
+  when: not (sentinel_server_desinstaller | bool)
+  tags:
+    - sentinel_server
+    - sentinel_server_pose
+
+- name: Armement — uniquement sur geste explicite d'un humain
+  ansible.builtin.include_tasks: 20_armement.yml
+  when:
+    - not (sentinel_server_desinstaller | bool)
+    - sentinel_server_enabled | bool
+  tags:
+    - sentinel_server
+    - sentinel_server_armement
+
+- name: Bilan — y compris ce qui a été signalé sans être joué
+  ansible.builtin.include_tasks: 90_bilan.yml
+  when: not (sentinel_server_desinstaller | bool)
+  tags:
+    - sentinel_server
+    - sentinel_server_bilan
+    - always
