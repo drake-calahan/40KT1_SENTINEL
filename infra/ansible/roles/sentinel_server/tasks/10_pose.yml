@@ -169,19 +169,14 @@
 # Absente ne veut pas dire la même chose des deux côtés, et c'est tout l'enjeu :
 # en `--check` c'est NORMAL (rien n'a été posé) et ça se signale ; après un
 # apply c'est un DÉFAUT (le paquet devait poser son unité) et ça échoue.
-- name: Relever si l'unité du moteur est connue de systemd
-  ansible.builtin.command:
-    cmd: systemctl list-unit-files --no-legend {{ sentinel_server_unite }}
+- name: Relever les unités connues de systemd
+  ansible.builtin.service_facts:
   become: true
-  register: sentinel_server_unite_connue
-  changed_when: false
-  failed_when: false
-  check_mode: false
 
-- name: Établir si l'unité existe
+- name: Établir si l'unité du moteur existe
   ansible.builtin.set_fact:
     sentinel_server_unite_existe: >-
-      {{ sentinel_server_unite in (sentinel_server_unite_connue.stdout | default('')) }}
+      {{ sentinel_server_unite in (ansible_facts.services | default({})) }}
 
 - name: S'assurer que le moteur n'est ni activé ni démarré
   ansible.builtin.systemd_service:
