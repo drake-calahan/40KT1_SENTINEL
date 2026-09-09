@@ -270,8 +270,24 @@ alerte réelle traitée de bout en bout.
       **des deux côtés** pour autoriser le retrait depuis l'arborescence de HQ ·
       restreindre l'autorisation à des sous-chemins nommés. Ne se tranche pas
       dans un module Python.
-- [ ] **P03.1** (claude) Relais mince côté agent : le mécanisme de réponse active
-      de l'outil sert de transport, l'exécuteur local décide.
+- [~] **P03.1** (claude, 2026-09-09) `responder/relais.py` — le mécanisme de
+      réponse active du moteur sert de **transport**, et rien d'autre. Le relais
+      **extrait** trois champs et les passe à l'exécuteur ; il ne consulte ni le
+      catalogue, ni le budget, ni le mode tournoi, ni le témoin de désarmement.
+      C'est une propriété de sécurité, pas un goût d'architecture : le relais est
+      la surface exposée au serveur central, et s'il décidait quoi que ce soit,
+      un serveur compromis déciderait avec lui. Il **n'infère jamais le geste
+      depuis la règle** — déduire, ce serait prendre la décision que le catalogue
+      porte, dans le fichier le moins relu du dépôt. Il refuse l'annulation par
+      le moteur : nos gestes portent leur propre retour arrière, tracé au
+      journal, et une annulation externe serait un second chemin invisible.
+      19 tests, presque tous sur des refus. 107 tests verts au total.
+- [ ] **P03.9** (claude) Confirmer la forme réelle de l'enveloppe de réponse
+      active **contre la version du moteur effectivement installée**
+      (`sentinel_server_wazuh_version`). `responder/relais.py` lit aujourd'hui un
+      sous-ensemble documenté et refuse ce qu'il ne comprend pas — donc il se
+      teste, mais il **ne s'arme pas**. À faire après `P01.1`, quand un agent
+      existe pour produire une vraie enveloppe. **Porte d'armement de `P03.4`.**
 - [ ] **P03.2** (cursor) Mode à blanc — runbook de lecture du journal et
       définition d'un geste injustifié —
       [brief](briefs/P03.2-runbook-mode-a-blanc.md).
