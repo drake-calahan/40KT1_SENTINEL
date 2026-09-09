@@ -1,17 +1,18 @@
 ---
 name: Ansible CI
 
+# ⚠️ AUCUN FILTRE `paths` ICI, ET C'EST VOULU (`P00.12`, 2026-09-09).
+# Ce contrôle est OBLIGATOIRE à la fusion dans le ruleset `main-protection`.
+# Un contrôle requis qui ne se DÉCLENCHE pas ne rend jamais son verdict, et
+# GitHub attend indéfiniment : la PR devient infusionnable. Un filtre `paths`
+# et un contrôle requis ne vont donc pas ensemble. Le coût est quelques
+# secondes de CI sur une PR documentaire ; le prix de l'autre choix est une
+# branche bloquée que personne ne sait débloquer.
 on:
   push:
     branches:
       - main
-    paths:
-      - 'infra/ansible/**'
-      - '.github/workflows/ansible-ci.yml'
   pull_request:
-    paths:
-      - 'infra/ansible/**'
-      - '.github/workflows/ansible-ci.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

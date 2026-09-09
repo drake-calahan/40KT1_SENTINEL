@@ -57,10 +57,15 @@ sort :
   réels du parc sont `fortyk-*`, pas `40kt1-*` : les quatre conteneurs de
   production étaient tous arrêtables sous leur vrai nom. Corrigé et testé.
 
-**Quatre questions attendent encore le PO** — aucune ne bloque `cursor`, toutes
-bloquent un armement : `P00.12` (la garde `garde-armement` n'est **pas
-obligatoire** à la fusion — un contrôle qui échoue sans bloquer est un avis) ·
-`P01.13` (que veut dire « la relève s'arme » — le chemin est relevé, le sens ne
+**2026-09-09 — la CI est enfin bloquante.** Le ruleset `main-protection` ne
+portait **aucune** règle de contrôle requis : ni `garde-armement`, ni les trois
+workflows que `P00.6` affirme avoir rendus obligatoires. Une PR rouge sur les
+quatre contrôles était fusionnable. Les quatre contextes sont désormais requis,
+et les filtres `paths` des workflows retirés — un contrôle requis qui ne se
+déclenche pas bloque la PR pour toujours.
+
+**Trois questions attendent encore le PO** — aucune ne bloque `cursor`, toutes
+bloquent un armement : `P01.13` (que veut dire « la relève s'arme » — le chemin est relevé, le sens ne
 l'est pas ; bloque l'armement de l'interlock `P01.4`) · `P03.8` (la quarantaine
 refuse l'arborescence de HQ, conformément au contrat — et c'est gênant) ·
 `P03.9` (confirmer l'enveloppe de réponse active).
