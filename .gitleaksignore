@@ -6,4 +6,28 @@
 # supprimer. Ce fichier est la porte de sortie du gate secrets — il se relit
 # en revue, comme du code.
 #
-# (aucune exception à ce jour)
+# --- DEUX MÉCANISMES, ET QUAND CHOISIR L'UN OU L'AUTRE ------------------------
+#
+# 1. UNE ENTRÉE ICI, indexée par SHA de commit. À préférer quand la ligne
+#    incriminée est FIGÉE : l'exception est alors centralisée, et ce fichier
+#    reste l'endroit unique où l'on voit tout ce qui a été laissé passer.
+#
+# 2. UN COMMENTAIRE `gitleaks:allow` EN LIGNE, à côté de la valeur. À préférer
+#    quand la valeur est destinée à CHANGER : une empreinte indexée par SHA se
+#    périme au premier commit qui touche la ligne, et le gate rougit alors sans
+#    cause réelle — ce qui apprend à passer outre, c'est-à-dire exactement ce
+#    qu'un gate de secrets ne doit jamais apprendre.
+#
+#    Le prix de ce second mécanisme est qu'une exception n'apparaît plus ici. On
+#    le paie sciemment : le motif, lui, est écrit à l'endroit où un relecteur
+#    tombera dessus, ce qui vaut mieux qu'un renvoi.
+#
+#    Exceptions en ligne à ce jour :
+#      - infra/ansible/roles/sentinel_server/defaults/main.yml —
+#        `sentinel_server_repo_key_fingerprint`. Empreinte d'une clé PUBLIQUE de
+#        dépôt de paquets : 40 caractères hexadécimaux, donc lue comme une
+#        « generic-api-key ». Elle est faite pour être publiée — sa valeur tient
+#        à ce que tout le monde puisse la comparer. Elle doit encore être relevée
+#        sur la source officielle, donc elle changera.
+#
+# (aucune exception indexée par SHA à ce jour)
