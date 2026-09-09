@@ -48,23 +48,24 @@
   </rule>
 
   <!--
-    Exclusion : fichiers temporaires d'éditeur laissés sous scripts/ pendant une session de dev.
-    Motif : édition manuelle d'un script laisse parfois un .swp ou .tmp sans intention de déploiement.
+    Exclusion : fichiers temporaires d'éditeur sous scripts/ pendant une session de dev.
+    Motif restreint : swap vim (.<nom>.swp) et sauvegarde nano (.save) — pas de .tmp libre.
   -->
   <rule id="100156" level="0">
     <if_sid>100122</if_sid>
-    <field name="file" type="pcre2">\.(swp|tmp|save|bak~)$</field>
-    <description>Exclusion : fichiers temporaires d'éditeur sous scripts/ HQ</description>
+    <field name="file" type="pcre2">/\.[^/]+\.sw[a-z]?$|\.save$</field>
+    <description>Exclusion : swap vim / sauvegarde nano sous scripts/ HQ</description>
   </rule>
 
   <!--
-    Exclusion : cache d'ingest du scraper sous scripts/ (fichiers .cache ou .tmp d'exécution).
-    Motif : l'ingest nocturne du scraper réécrit des caches locaux sans modifier la configuration.
+    Exclusion : artefacts nommés de l'ingest scraper sous scripts/ HQ.
+    Motif volontairement étroit (ingest.cache / ingest.tmp) — un .cache ou .tmp
+    générique sous scripts/ reste une alerte.
   -->
   <rule id="100157" level="0">
     <if_sid>100122</if_sid>
-    <field name="file" type="pcre2">\.(cache|ingest\.tmp)$</field>
-    <description>Exclusion : cache d'ingest scraper sous scripts/ HQ</description>
+    <field name="file" type="pcre2">ingest\.(cache|tmp)$</field>
+    <description>Exclusion : cache/tmp d'ingest scraper sous scripts/ HQ</description>
   </rule>
 
 </group>
