@@ -27,7 +27,7 @@
 
 - name: Télécharger la clé du dépôt dans un fichier temporaire
   ansible.builtin.get_url:
-    url: "{{ sentinel_agent_repo_key_url }}"
+    url: "{{ sentinel_server_repo_key_url }}"
     dest: /tmp/sentinel-agent-repo-key.asc
     mode: "0644"
   become: true
@@ -45,10 +45,10 @@
 - name: L'empreinte servie correspond à l'empreinte attendue
   ansible.builtin.assert:
     that:
-      - sentinel_agent_empreinte_relevee.stdout is search(sentinel_agent_repo_key_fingerprint)
+      - sentinel_agent_empreinte_relevee.stdout is search(sentinel_server_repo_key_fingerprint)
     fail_msg: >-
-      EMPREINTE NON CONFORME. La clé servie par {{ sentinel_agent_repo_key_url }}
-      ne porte pas l'empreinte attendue ({{ sentinel_agent_repo_key_fingerprint }}).
+      EMPREINTE NON CONFORME. La clé servie par {{ sentinel_server_repo_key_url }}
+      ne porte pas l'empreinte attendue ({{ sentinel_server_repo_key_fingerprint }}).
       NE PAS INSTALLER. Prévenir le PO.
     success_msg: "empreinte de la clé de dépôt : conforme"
     quiet: true
@@ -72,8 +72,8 @@
   ansible.builtin.apt_repository:
     repo: >-
       deb [signed-by=/usr/share/keyrings/sentinel-wazuh.gpg]
-      {{ sentinel_agent_repo_url }} {{ sentinel_agent_repo_suite }}
-      {{ sentinel_agent_repo_composant }}
+      {{ sentinel_server_repo_url }} {{ sentinel_server_repo_suite }}
+      {{ sentinel_server_repo_composant }}
     filename: sentinel-wazuh
     state: present
     update_cache: true
@@ -102,7 +102,7 @@
 
 - name: Installer l'agent, à la version épinglée
   ansible.builtin.apt:
-    name: "{{ sentinel_agent_paquet }}={{ sentinel_agent_wazuh_version }}-*"
+    name: "{{ sentinel_agent_paquet }}={{ sentinel_server_wazuh_version }}-*"
     state: present
     update_cache: true
   become: true
@@ -166,7 +166,9 @@
     cmd: >-
       {{ sentinel_agent_ossec_dir }}/bin/agent-auth
       -m {{ sentinel_agent_server_host }}
-      -A {{ sentinel_agent_enroll_key }}
+      -p {{ sentinel_server_port_enrolement }}
+      -P {{ sentinel_agent_enroll_key }}
+      -A {{ inventory_hostname }}
     creates: "{{ sentinel_agent_client_keys }}"
   become: true
   no_log: true

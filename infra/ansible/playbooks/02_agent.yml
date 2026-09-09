@@ -44,6 +44,13 @@
   become: false
   serial: 1
 
+  pre_tasks:
+    - name: Charger l'épingle unique du moteur (portée par le rôle serveur)
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../roles/sentinel_server/defaults/main.yml"
+      tags:
+        - always
+
   roles:
     - role: sentinel_agent
       tags:

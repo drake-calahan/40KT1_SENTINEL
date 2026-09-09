@@ -6,7 +6,7 @@
     msg:
       - "hôte              : {{ inventory_hostname }}"
       - "armement          : {{ 'ARMÉ' if sentinel_agent_enabled | bool else 'désarmé (défaut du dépôt)' }}"
-      - "version épinglée  : {{ sentinel_agent_wazuh_version }}"
+      - "version épinglée  : {{ sentinel_server_wazuh_version }} (source : rôle serveur)"
       - "manager (MagicDNS): {{ sentinel_agent_server_host | default('non résolu') }}"
       - >-
         enrôlement        : {{ 'déjà en place' if sentinel_agent_deja_enrolle | default(false)

@@ -24,16 +24,28 @@
       Ce rôle ne s'exécute que sur les endpoints Linux du parc.
     quiet: true
 
-- name: L'empreinte de la clé de dépôt a été relevée sur la source officielle
+- name: L'épingle du moteur est portée par le rôle serveur (pas une copie agent)
   ansible.builtin.assert:
     that:
-      - sentinel_agent_repo_key_confirmee | bool
+      - sentinel_server_wazuh_version is defined
+      - sentinel_server_wazuh_version | length > 0
+    fail_msg: >-
+      « sentinel_server_wazuh_version » est absente. L'épingle unique vit dans
+      roles/sentinel_server/defaults/main.yml ; le playbook 02_agent.yml doit
+      la charger (include_vars) avant ce rôle. Ne pas inventer une seconde
+      version dans sentinel_agent/defaults.
+    quiet: true
+
+- name: L'empreinte de la clé de dépôt a été confirmée (source serveur, A2)
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_repo_key_confirmee is defined
+      - sentinel_server_repo_key_confirmee | bool
     fail_msg: >-
       L'empreinte de la clé du dépôt de paquets n'a PAS été confirmée
-      (sentinel_agent_repo_key_confirmee = false). Ce rôle ajoute un dépôt
-      tiers à une machine de production : sans empreinte vérifiée, on installe
-      la menace n° 2 du classement B1. Marche à suivre dans
-      roles/sentinel_agent/defaults/main.yml, au-dessus de la variable.
+      (sentinel_server_repo_key_confirmee = false). Même dépôt que le serveur
+      central : la confirmation vit dans roles/sentinel_server/defaults
+      (arbitrage A2). Sans elle, on installe la menace n° 2 du classement B1.
     quiet: true
 
 - name: Le chemin de la stack HQ vient de l'inventaire

@@ -22,9 +22,11 @@ paquet pour empêcher un démarrage par effet de bord.
 
 ## Prérequis sur la machine
 
-1. **Confirmer l'empreinte de la clé du dépôt** — `sentinel_agent_repo_key_confirmee`
-   doit passer à `true` dans `defaults/main.yml` après vérification (même procédure
-   que `sentinel_server`).
+1. **Épingle et clé de dépôt** — portées par le rôle serveur
+   (`sentinel_server_wazuh_version`, `sentinel_server_repo_key_*` dans
+   `roles/sentinel_server/defaults/main.yml`). Le playbook `02_agent.yml` les
+   charge avant le rôle ; **aucune seconde copie** dans ce rôle. Version
+   courante après `P01.10` : `4.14.7` ; empreinte confirmée en `A2`.
 
 2. **Poser le `.env`** — `{{ sentinel_install_dir }}/.env`, mode `0600`, avec au
    minimum :

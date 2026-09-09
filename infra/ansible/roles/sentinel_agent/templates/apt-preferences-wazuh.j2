@@ -5,7 +5,7 @@
 # remplace l'agent une nuit, sans décision humaine, sur une machine de production.
 
 Package: {{ sentinel_agent_paquet }}
-Pin: version {{ sentinel_agent_wazuh_version }}-*
+Pin: version {{ sentinel_server_wazuh_version }}-*
 Pin-Priority: 1001
 
 {% for paquet in sentinel_agent_paquets_interdits %}
