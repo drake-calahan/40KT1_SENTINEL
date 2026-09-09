@@ -5,9 +5,11 @@
 
 ## En une ligne
 
-**Phase 0 — cadrage consigné, formalisation faite.** Trente réponses PO
-(2026-09-07), quatre STRUCTURANTES tranchées. Les **trois ADR sont Acceptées**
-(2026-09-07). **Aucune machine du parc ne porte quoi
+**Phase 0 close, phase 1 en cours d'écriture.** Trente réponses PO
+(2026-09-07), quatre STRUCTURANTES tranchées, les **trois ADR Acceptées**.
+Au **2026-09-09** : le gabarit de rôle, le serveur central, le bornage, les
+quatre gestes armables, le relais et le moteur de bruit sont **écrits et
+testés**, en attente de revue sur une PR unique. **Aucune machine du parc ne porte quoi
 que ce soit de ce dépôt, et rien n'est armé.**
 
 ## Avancement

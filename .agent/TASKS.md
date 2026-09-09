@@ -45,6 +45,21 @@ partie, toujours.**
 > au critère de sortie de la phase 1. Deux suites sont **ouvertes**, décrites
 > plus bas en « Suites de revue ».
 >
+> **2026-09-09, seconde partie — six lots enchaînés sur une seule branche.**
+> Sur instruction explicite du PO (« enchaîne le maximum sur cette branche, on
+> fera une grosse PR »), `claude` a livré `P01.6`, `P01.0`, `P01.4`, `P03.6`,
+> `P03.1` et `P02.2` sur `claude/cursor-work-review-2f7ede`.
+>
+> Six `[~]` pour un même agent **dérogent à « une tâche à la fois »**, et c'est
+> écrit ici plutôt que passé sous silence. Ce que la règle protège — la
+> collision avec `cursor` — n'est pas en cause : aucun de ces lots ne touche une
+> zone de `cursor` (`rules/`, `scripts/`, `roles/sentinel_agent/`). Ce qui
+> disparaît, en revanche, c'est le **grain de revue** : une PR de ~5 500 lignes
+> se relit moins bien que six. C'est le coût assumé de la consigne, et il vaut
+> d'être connu au moment de relire.
+>
+> **Aucun de ces six ne se coche avant le vert de la CI sur la PR.**
+>
 > **La suite, en parallèle** :
 > - `cursor` → **`P01.2`** (règles d'intégrité). Elle ne dépend **que** de
 >   `P00.2`, qui est faite : elle part **maintenant**, sans attendre le gabarit
