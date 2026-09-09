@@ -154,10 +154,24 @@ partie, toujours.**
       une garde qui crie à tort finit désarmée.
       *Le gabarit `P01.6` impose déjà `false` littéral côté rôle ; cette garde
       est la ceinture, pas les bretelles.*
-- [ ] **P00.12** (PO) Rendre `garde-armement` **obligatoire** dans le ruleset
-      `main-protection`, aux côtés des trois workflows de `P00.6`. Un contrôle
-      qui échoue mais ne bloque pas la fusion est un avis, pas une garde — et
-      `RULES` § 1 ne demande pas un avis. **Geste d'exploitation : PO.**
+- [x] **P00.12** (PO — ordre, 2026-09-09 · claude — mise en œuvre) Rendre les
+      contrôles **obligatoires** dans le ruleset `main-protection`. **Fait — et
+      le constat est plus large que la tâche.**
+      À l'ouverture, le ruleset ne portait **aucune** règle
+      `required_status_checks` : ni `garde-armement`, ni les trois workflows que
+      `P00.6` affirme avoir rendus obligatoires. **Une PR rouge sur les quatre
+      contrôles était fusionnable.** `P00.6` a donc été cochée sur une
+      affirmation qui n'était pas vraie — ce n'est pas une négligence de plus,
+      c'est le rappel qu'un réglage de forge ne se vérifie qu'en le lisant.
+      Les quatre contextes sont désormais requis : `Ansible & YAML Lint`,
+      `garde-armement`, `gitleaks`, `ruff & pytest`.
+      **Et un piège a été refermé dans le même geste** : trois des quatre
+      workflows portaient un filtre `paths` / `paths-ignore`. Un contrôle requis
+      qui ne se **déclenche** pas ne rend jamais son verdict, et GitHub attend
+      indéfiniment : toute PR documentaire — c'est-à-dire la plupart des PR de
+      ce dépôt — serait devenue **infusionnable**. Les filtres sont retirés, et
+      chaque fichier de workflow porte l'encadré qui dit pourquoi il n'en aura
+      plus jamais. Le coût est de quelques secondes de CI sur une PR de texte.
 
 ## Suites de la revue de `P01.2` — ouvertes le 2026-09-09
 
