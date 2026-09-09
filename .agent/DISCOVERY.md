@@ -188,6 +188,44 @@ seul endroit qui peut le voir est la **garde de cible**, en amont.
 **Implication** : lot `P00.11`. En attendant, le gabarit impose `false` littéral
 dans `defaults/` — et la garde CI reste la ceinture, pas les bretelles.
 
+## L'exécuteur — trois pièges relevés en câblant les gestes (`P03.6`)
+
+### `is_private` de Python ne protège pas le tailnet de façon stable
+
+*2026-09-09.* Première version de `bloquer_ip` : refuser les adresses privées
+avec `adresse.is_private`. Défaut mesuré — **la plage du tailnet
+(`100.64.0.0/10`) n'y est pas classée de la même façon selon la version de
+Python**, et `is_private` couvre par ailleurs les plages de documentation
+(`203.0.113.0/24`), que rien n'oblige à protéger.
+
+**Implication** : le chemin d'administration du parc dépendait du hasard d'une
+mise à jour d'interpréteur. Les plages protégées sont désormais **nommées une par
+une**, avec leur motif, dans `PLAGES_PROTEGEES`. Une garde qui protège le chemin
+du retour ne se délègue pas à une propriété de bibliothèque.
+
+### Un geste qui échoue ne laissait aucune trace
+
+*2026-09-09.* `P03.0` appelait le geste câblé puis journalisait `execute`. Si le
+geste levait, l'exception s'échappait de `traiter()` : **ni geste, ni refus, ni
+ligne au journal**. On croyait la menace traitée, et la tentative ne consommait
+pas le budget — donc elle se rejouait sans fin.
+
+**Implication** : résultat `echoue`, distinct de `refuse` (refuser, c'est décider
+de ne pas agir ; échouer, c'est avoir essayé sans aboutir), et **consommateur de
+budget**. Une tentative reste une tentative.
+
+### Le catalogue se contourne en changeant de nom de geste
+
+*2026-09-09.* Arrêter le conteneur `cloudflared` **est** `couper_connecteur` —
+classé *alerte* en nominal, *jamais* en tournoi. Rien n'empêchait un ordre
+`arreter_conteneur` de cible `cloudflared` de le jouer quand même. Le catalogue
+fermé cessait d'être fermé, sans qu'une ligne de `catalogue.py` ait bougé.
+
+**Implication** : chaque geste porte la liste de ce sur quoi il refuse d'agir, et
+cette liste se lit comme une **conséquence du catalogue**, pas comme une
+préférence. À généraliser : avant de câbler un geste, se demander *quel autre
+geste du catalogue celui-ci permettrait de jouer par un autre nom*.
+
 ## Contraintes de ressources
 
 - Serveur central en profil frugal : **0,7 à 1,2 Go** de RAM. Le profil complet

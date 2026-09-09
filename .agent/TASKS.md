@@ -234,9 +234,42 @@ alerte réelle traitée de bout en bout.
       **et** refus), dégel tracé. 36 tests, dont les quatre refus obligatoires et
       les cas de dégradation. `ruff` + `pytest` verts. **Aucun geste privilégié :
       rien ne peut être joué.**
-- [ ] **P03.6** (claude) Les quatre gestes armables du catalogue, chacun avec son
-      retour arrière : blocage d'IP à expiration, arrêt de processus, arrêt de
-      conteneur, mise en quarantaine d'un fichier.
+- [~] **P03.6** (claude, 2026-09-09) `responder/gestes/` — les quatre gestes
+      armables, **chacun rendant la commande exacte qui le défait**, avec ses
+      valeurs, jusqu'au journal (`ADR-062` : défaire *sans arbitrage* ; laisser
+      l'exploitant retrouver la commande à 3 h du matin **est** de l'arbitrage).
+      Jamais de shell, délai sur toute commande, cible **revalidée localement**
+      (le serveur central ordonne, le nœud vérifie — `ADR-002` § 3).
+      `verifier_coherence()` interdit de câbler un geste que le catalogue ne
+      classe pas *armé*. 88 tests verts, `ruff` 0.6.9 (version CI) vert.
+      **Deux défauts corrigés au passage, tous deux dans `P03.0`** :
+      (a) un geste qui **échoue** ne laissait *aucune* entrée au journal et
+      l'exception s'échappait de `traiter()` — on croyait la menace traitée et
+      la tentative ne consommait pas le budget, donc elle se rejouait sans fin.
+      Nouveau résultat `echoue`, consommateur de budget ;
+      (b) `bloquer_ip` s'appuyait d'abord sur `is_private`, qui **ne classe pas
+      `100.64.0.0/10` — le tailnet — de la même façon selon la version de
+      Python**. Le chemin d'administration du parc dépendait d'une mise à jour
+      d'interpréteur. Plages désormais **nommées une par une**.
+- [ ] **P03.7** (PO) Confirmer la **liste des conteneurs non arrêtables**
+      (`responder/gestes/arreter_conteneur.py`). Motif : arrêter `cloudflared`
+      **est** `couper_connecteur`, classé *alerte* en nominal et *jamais* en
+      tournoi — l'autoriser rendrait exécutable un geste alerte-seulement en
+      changeant de nom de geste, et le catalogue fermé cesserait d'être fermé.
+      Même raisonnement pour `db` (la donnée), `caddy` (le nom public) et `api`
+      (la version servie), au titre de `RULES` § 2. **Rétrécir ne demande aucun
+      amendement** — c'est fait. Ce qu'il faut du PO, c'est confirmer que la
+      liste couvre bien les noms réels des conteneurs du parc.
+- [ ] **P03.8** (PO — arbitrage · claude — mise en œuvre) **Quarantaine et
+      frontière HQ.** `quarantaine_fichier` refuse tout chemin sous `/srv/40kt1`
+      ou `~/40KT1_HQ` : le contrat dit que Sentinelle les surveille **en
+      lecture** et n'y écrit pas — or déplacer un fichier hors d'un répertoire,
+      c'est y écrire. La limite est conforme et **gênante** : un fichier déposé
+      par un attaquant dans la stack est exactement ce qu'on voudrait mettre de
+      côté. Trois issues : garder le refus (alerte seule) · amender le contrat
+      **des deux côtés** pour autoriser le retrait depuis l'arborescence de HQ ·
+      restreindre l'autorisation à des sous-chemins nommés. Ne se tranche pas
+      dans un module Python.
 - [ ] **P03.1** (claude) Relais mince côté agent : le mécanisme de réponse active
       de l'outil sert de transport, l'exécuteur local décide.
 - [ ] **P03.2** (cursor) Mode à blanc — runbook de lecture du journal et
