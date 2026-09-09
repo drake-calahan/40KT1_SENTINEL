@@ -22,8 +22,12 @@ if ! git rev-parse --verify "${BASE_REF}^{commit}" >/dev/null 2>&1; then
   exit 2
 fi
 
-# Motifs refusés (espaces optionnels autour du séparateur).
-PATTERN='sentinel_[a-z_]*_enabled[[:space:]]*:[[:space:]]*true|SENTINEL_[A-Z_]*_ENABLED[[:space:]]*=[[:space:]]*true|sentinel_response_dry_run[[:space:]]*:[[:space:]]*false|SENTINEL_RESPONSE_DRY_RUN[[:space:]]*=[[:space:]]*false'
+# Motifs refusés (espaces optionnels autour du séparateur ; guillemets optionnels).
+# Ansible écrit souvent yes/on/True — le littéral true seul laissait passer le
+# mode de panne mesuré en P00.11 (2026-09-09). dry_run : false/no/off/… = armement.
+TRUE_VAL="['\"]?(true|yes|on|True|Yes|On)['\"]?"
+FALSE_VAL="['\"]?(false|no|off|False|No|Off)['\"]?"
+PATTERN="sentinel_[a-z_]*_enabled[[:space:]]*:[[:space:]]*${TRUE_VAL}|SENTINEL_[A-Z_]*_ENABLED[[:space:]]*=[[:space:]]*${TRUE_VAL}|sentinel_response_dry_run[[:space:]]*:[[:space:]]*${FALSE_VAL}|SENTINEL_RESPONSE_DRY_RUN[[:space:]]*=[[:space:]]*${FALSE_VAL}"
 
 # Chemins exclus : un runbook doit pouvoir montrer la commande d'armement.
 is_excluded() {
