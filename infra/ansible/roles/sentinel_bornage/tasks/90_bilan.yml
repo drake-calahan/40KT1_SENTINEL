@@ -5,7 +5,12 @@
 # que systemd applique RÉELLEMENT, pas ce que le template a écrit. Un drop-in
 # posé sans `daemon-reload` est un fichier, pas une limite — et la différence ne
 # se voit pas dans un `--diff`.
-- name: Relire les plafonds réellement appliqués par systemd
+# noqa: command-instead-of-module — le module `systemd_service` GÈRE un service ;
+# il ne sait pas RENDRE une propriété appliquée. Or c'est exactement ce qu'on
+# veut ici : relire ce que systemd applique vraiment, pour refuser un plafond
+# annoncé et non appliqué. Remplacer cette lecture par le module reviendrait à
+# supprimer le contrôle, pas à l'améliorer.
+- name: Relire les plafonds réellement appliqués par systemd # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: >-
       systemctl show {{ sentinel_bornage_unite }}
@@ -23,7 +28,10 @@
     msg:
       - "hôte                : {{ inventory_hostname }}"
       - "unité bornée        : {{ sentinel_bornage_unite }}"
-      - "plafond DEMANDÉ     : MemoryHigh={{ sentinel_bornage_memory_high }} MemoryMax={{ sentinel_bornage_memory_max }} CPUQuota={{ sentinel_bornage_cpu_quota }}"
+      - >-
+        plafond DEMANDÉ     : MemoryHigh={{ sentinel_bornage_memory_high }}
+        MemoryMax={{ sentinel_bornage_memory_max }}
+        CPUQuota={{ sentinel_bornage_cpu_quota }}
       - "plafond APPLIQUÉ    : {{ sentinel_bornage_mesure.stdout_lines | default(['NON MESURÉ (--check)']) | join(' · ') }}"
       - "interlock (cond. 2) : {{ 'ARMÉ' if sentinel_bornage_interlock_enabled | bool else 'posé, DÉSARMÉ (défaut du dépôt)' }}"
       - "état relève lu dans : {{ hq_failover_state_file }}{{ '' if hq_failover_state_confirme | bool else '  ⚠️ CHEMIN NON CONFIRMÉ' }}"

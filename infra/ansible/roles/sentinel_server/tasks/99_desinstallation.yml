@@ -75,6 +75,10 @@
     msg:
       - "hôte    : {{ inventory_hostname }}"
       - "logiciel: retiré ({{ sentinel_server_paquet }}), dépôt et épinglage retirés"
-      - "état    : {{ 'DÉTRUIT — journaux et base des agents effacés' if sentinel_server_purger_etat | bool else 'CONSERVÉ dans ' ~ sentinel_server_ossec_dir ~ ' — le retirer est un geste séparé' }}"
+      - >-
+        état    : {{ 'DÉTRUIT — journaux et base des agents effacés'
+                     if sentinel_server_purger_etat | bool
+                     else 'CONSERVÉ dans ' ~ sentinel_server_ossec_dir
+                          ~ ' — le retirer est un geste séparé' }}
       - "agents  : les agents des nœuds pointent toujours vers cet hôte. Les ré-enrôler ou les désinstaller (P01.1) fait partie du même geste."
       - "ACTIVE.md : mettre à jour le tableau d'armement — c'est lui qui répond à « qu'est-ce qui tourne où »."

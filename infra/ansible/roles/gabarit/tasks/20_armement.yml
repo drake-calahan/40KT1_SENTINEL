@@ -30,16 +30,16 @@
   ansible.builtin.fail:
     msg: >-
       {{
-        'ARMEMENT REFUSÉ : le témoin de désarmement d\'urgence '
-        ~ sentinel_disarm_file ~ ' est PRÉSENT. Il a été posé par quelqu\'un, '
-        ~ 'et il se retire par le même geste — jamais par un playbook.'
+        "ARMEMENT REFUSÉ : le témoin de désarmement d'urgence "
+        ~ sentinel_disarm_file ~ " est PRÉSENT. Il a été posé par quelqu'un, "
+        ~ "et il se retire par le même geste — jamais par un playbook."
         if ('stat' in gabarit_temoin_desarmement
             and gabarit_temoin_desarmement.stat.exists)
         else
-        'ARMEMENT REFUSÉ : le témoin de désarmement ' ~ sentinel_disarm_file
-        ~ ' n\'a pas pu être LU. État inconnu. Un `ok` n\'est pas un `inconnu` '
-        ~ '(.agent/RULES.md § 1) : on n\'arme pas sur une mesure qu\'on n\'a '
-        ~ 'pas pu prendre.'
+        "ARMEMENT REFUSÉ : le témoin de désarmement " ~ sentinel_disarm_file
+        ~ " n'a pas pu être LU. État inconnu. Un `ok` n'est pas un `inconnu` "
+        ~ "(.agent/RULES.md § 1) : on n'arme pas sur une mesure qu'on n'a "
+        ~ "pas pu prendre."
       }}
   when: >-
     'stat' not in gabarit_temoin_desarmement

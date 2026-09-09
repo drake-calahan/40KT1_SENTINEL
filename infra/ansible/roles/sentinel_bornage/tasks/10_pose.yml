@@ -88,12 +88,16 @@
 # ── Ce qu'on signale sans le jouer ────────────────────────────────────────
 - name: Signaler que l'interlock est posé mais désarmé
   ansible.builtin.set_fact:
+    # Chaînes Jinja en GUILLEMETS DOUBLES : le français est plein d'apostrophes,
+    # et `\'` dans une chaîne Jinja simple-quotée n'est pas l'échappement qu'on
+    # croit — le lexer coupe la chaîne à l'apostrophe et la tâche ne se charge
+    # même pas. Mesuré en CI le 2026-09-09.
     sentinel_bornage_points_signales: >-
       {{ sentinel_bornage_points_signales + [
-           'Interlock de relève POSÉ mais DÉSARMÉ (condition 2 d\'ADR-003). '
-           ~ 'Le plafond, lui, est actif — la condition 1 ne dépend pas de '
-           ~ 'l\'interlock. Armer : geste d\'exploitation, après confirmation '
-           ~ 'du chemin de l\'état de la relève côté HQ (P00.5).'
+           "Interlock de relève POSÉ mais DÉSARMÉ (condition 2 d'ADR-003). "
+           ~ "Le plafond, lui, est actif — la condition 1 ne dépend pas de "
+           ~ "l'interlock. Armer : geste d'exploitation, après confirmation "
+           ~ "du chemin de l'état de la relève côté HQ (P00.5)."
          ] }}
   when: not (sentinel_bornage_interlock_enabled | bool)
 
@@ -101,9 +105,9 @@
   ansible.builtin.set_fact:
     sentinel_bornage_points_signales: >-
       {{ sentinel_bornage_points_signales + [
-           'Chemin de l\'état de la relève NON CONFIRMÉ ('
-           ~ hq_failover_state_file ~ '). Hypothèse calquée sur le témoin de '
-           ~ 'mode tournoi. À relever côté HQ et à consigner des DEUX côtés — '
-           ~ 'une frontière écrite d\'un seul côté n\'est pas une frontière.'
+           "Chemin de l'état de la relève NON CONFIRMÉ ("
+           ~ hq_failover_state_file ~ "). Hypothèse calquée sur le témoin de "
+           ~ "mode tournoi. À relever côté HQ et à consigner des DEUX côtés — "
+           ~ "une frontière écrite d'un seul côté n'est pas une frontière."
          ] }}
   when: not (hq_failover_state_confirme | bool)

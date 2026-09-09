@@ -178,6 +178,35 @@ de conclure** si l'ensemble atteint est vide, et nomme les nœuds restés
 `INCONNU`. Un play qui vise un groupe **vide**, lui, n'exécute aucune tâche : le
 seul endroit qui peut le voir est la **garde de cible**, en amont.
 
+### `\'` dans une chaîne Jinja : la tâche ne se charge même pas
+
+*2026-09-09.* Le français est plein d'apostrophes, et l'écrire `d\'ADR-003` dans
+une chaîne Jinja **simple-quotée** paraît naturel. Ça ne l'est pas : le moteur de
+templating d'Ansible coupe la chaîne à l'apostrophe et rend
+`expected token ',', got 'ADR'`. La tâche **ne se charge pas** — ce n'est pas une
+erreur d'exécution mais une erreur de chargement, qui peut se présenter comme un
+`internal-error: A malformed block was encountered` attribué à un **autre
+fichier** que celui qui la porte.
+
+**Ce qui rend le piège coûteux** : `jinja2` seul **accepte** `\'` — donc un
+contrôle local qui se contente de compiler les expressions passe au vert. C'est
+ce qui est arrivé : 193 expressions compilées localement, 4 fichiers cassés en CI.
+
+**Implication** : écrire les chaînes Jinja en **guillemets doubles** dès qu'elles
+contiennent une apostrophe, ce qui est la règle plutôt que l'exception en
+français. Le gabarit a été corrigé en premier — il se recopie.
+
+### `ansible-lint` ne s'installe pas sur le poste Windows du PO
+
+*2026-09-09.* Conflit de dépendances irrésoluble (`ansible-core` n'a pas de roue
+Windows). Conséquence : **`ansible-lint` ne se joue qu'en CI**, et un lot Ansible
+ne peut donc pas être annoncé vert avant que la PR ait tourné.
+
+**Implication** : ne pas cocher un lot Ansible sur des vérifications locales
+seules, et le dire dans la PR plutôt que de laisser croire à une vérification
+complète. `yamllint`, lui, s'installe et tourne — il attrape la forme, pas la
+sémantique Ansible.
+
 ### La garde CI d'armement ne voit pas `yes`
 
 *2026-09-09.* Mesuré sur `5ce90c0` : `sentinel_response_enabled: yes`,

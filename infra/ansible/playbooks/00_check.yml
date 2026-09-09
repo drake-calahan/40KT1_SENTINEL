@@ -89,7 +89,8 @@
     # ni l'autre. Le contournement (`ansible_become_exe: /usr/bin/sudo.ws`) est
     # dans l'inventaire ; cette tâche vérifie qu'il fonctionne encore.
     - name: L'élévation de privilège fonctionne sur ce nœud
-      ansible.builtin.command: /usr/bin/id -u
+      ansible.builtin.command:
+        cmd: /usr/bin/id -u
       become: true
       register: verif_become
       changed_when: false
@@ -129,7 +130,7 @@
             'INCONNU — non lisible, aucune conclusion'
             if 'stat' not in verif_stack
             else ('ok' if verif_stack.stat.exists
-                  else 'KO — déclaré dans l\'inventaire mais absent de la machine')
+                  else "KO — déclaré dans l'inventaire mais absent de la machine")
           }}
 
     # ── Le témoin de mode tournoi ─────────────────────────────────────────
@@ -183,7 +184,10 @@
           - "stack HQ          : {{ 'INCONNU' if 'stat' not in verif_stack else ('ok' if verif_stack.stat.exists else 'KO — absente') }}"
           - "mode tournoi (HQ) : {{ 'INCONNU — non lisible' if 'stat' not in verif_tournoi else ('ACTIF' if verif_tournoi.stat.exists else 'inactif') }}"
           - "notify.sh de HQ   : {{ 'INCONNU' if 'stat' not in verif_notify else ('ok' if verif_notify.stat.exists else 'KO — absent, P02.0 en dépend') }}"
-          - "install Sentinelle: {{ 'INCONNU' if 'stat' not in verif_install else ('PRÉSENT — anormal en phase 0/1' if verif_install.stat.exists else 'absent (attendu)') }}"
+          - >-
+            install Sentinelle: {{ 'INCONNU' if 'stat' not in verif_install
+            else ('PRÉSENT — anormal en phase 0/1' if verif_install.stat.exists
+                  else 'absent (attendu)') }}
           - "témoin désarmement: {{ 'INCONNU' if 'stat' not in verif_desarmement else ('POSÉ' if verif_desarmement.stat.exists else 'absent') }}"
 
 # ══════════════════════════════════════════════════════════════════════════

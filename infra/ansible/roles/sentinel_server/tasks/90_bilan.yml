@@ -10,7 +10,10 @@
       - "armement          : {{ 'ARMÉ' if sentinel_server_enabled | bool else 'désarmé (défaut du dépôt)' }}"
       - "version épinglée  : {{ sentinel_server_wazuh_version }} (gelée contre unattended-upgrades)"
       - "écoute prévue     : {{ sentinel_server_listen_ip | default('non résolue') }} ({{ sentinel_server_listen_interface | default('?') }})"
-      - "ports             : {{ sentinel_server_port_evenements }} événements · {{ sentinel_server_port_enrolement }} enrôlement · {{ sentinel_server_port_api }} API"
+      - >-
+        ports             : {{ sentinel_server_port_evenements }} événements ·
+        {{ sentinel_server_port_enrolement }} enrôlement ·
+        {{ sentinel_server_port_api }} API
       - "mode tournoi (HQ) : {{ sentinel_server_mode_tournoi }}"
       - "points signalés   : {{ sentinel_server_points_signales | length }}"
 

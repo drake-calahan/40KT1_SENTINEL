@@ -213,11 +213,14 @@
 
 - name: Signaler l'absence de bornage des ressources
   ansible.builtin.set_fact:
+    # Guillemets DOUBLES : `\'` dans une chaîne Jinja simple-quotée n'est pas
+    # l'échappement qu'on croit — le lexer coupe à l'apostrophe et la tâche ne se
+    # charge même pas. Le français en est plein. Mesuré en CI le 2026-09-09.
     sentinel_server_points_signales: >-
       {{ sentinel_server_points_signales + [
-           'Bornage cgroup ABSENT (conditions 1 et 2 d\'ADR-003, lot P01.4). '
-           ~ 'Le moteur cohabiterait avec le miroir Postgres et la relève sans '
-           ~ 'plafond mémoire. NON JOUÉ ici : P01.4 le pose. Ne pas armer avant.'
+           "Bornage cgroup ABSENT (conditions 1 et 2 d'ADR-003, lot P01.4). "
+           ~ "Le moteur cohabiterait avec le miroir Postgres et la relève sans "
+           ~ "plafond mémoire. NON JOUÉ ici : P01.4 le pose. Ne pas armer avant."
          ] }}
   when: >-
     'stat' not in sentinel_server_bornage
