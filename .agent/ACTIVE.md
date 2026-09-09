@@ -21,8 +21,11 @@ et **acceptés en revue**.
 `claude` a ensuite enchaîné **six lots sur une seule branche**, sur consigne du
 PO, pour une PR unique : `P01.6` (gabarit + `00_check`), `P01.0` (serveur
 central), `P01.4` (bornage + interlock), `P03.6` (les quatre gestes), `P03.1`
-(relais) et `P02.2` (moteur de bruit). **Aucun n'est coché** — ils attendent le
-vert de la CI sur la PR.
+(relais) et `P02.2` (moteur de bruit). La PR #9 est fusionnée et la CI est verte
+sur `main` : **quatre sont cochés** (`P01.6`, `P02.2`, `P03.6`, `P03.1`).
+**`P01.0` et `P01.4` restent ouverts** — leur condition n'a jamais été le vert
+de la CI mais un `--check --diff` réel, et ce sont précisément les deux lots qui
+exécutent du privilégié sur une machine de production.
 
 **2026-09-09, revue puis fusion des PR #10, #11 et #12** : `P01.2` (règles
 d'intégrité) est **fusionnée après trois corrections de revue**, et `P00.11`
@@ -30,10 +33,22 @@ d'intégrité) est **fusionnée après trois corrections de revue**, et `P00.11`
 complète — sept formes valides passaient encore au vert. Deux suites hors lot
 restent ouvertes (`P01.11`, `P01.12`), toutes deux à traiter dans `P01.1`.
 
-Ce qui part maintenant : **`P01.1`** (`cursor` — rôle `sentinel_agent`, débloqué
-par la fusion de `P01.6` et `P01.0` sur `main`, brief passé à **prêt**) ·
-**porter le jumeau du contrat dans HQ** (`P00.5`, dernière moitié — dépôt
-tiers).
+**`P01.1`** (`cursor` — rôle `sentinel_agent`) est **rendu et relu** (PR #13,
+2026-09-09) : le lot tient, **quatre corrections sont demandées avant fusion**.
+La plus notable n'est pas un défaut d'écriture mais une asymétrie que le gabarit
+ne pouvait pas attraper — sur un **agent**, un `<active-response>` absent vaut
+`disabled=no`, là où sur le manager l'absence ne définit aucune commande. Le
+même silence dit l'inverse des deux côtés du dialogue.
+
+La revue a aussi montré qu'un gabarit propage ses défauts : deux problèmes de
+`sentinel_agent` sont **hérités de `sentinel_server`** et se corrigent sur les
+deux rôles à la fois — le `--check` obligatoire qui échoue sur un hôte vierge
+(`P01.15`) et la clé de dépôt qui transite par un chemin fixe de `/tmp`
+(`P01.16`).
+
+Ce qui part maintenant : `cursor` rend les quatre corrections de `P01.1` ·
+`claude` prend `P01.15` puis `P01.16` · **porter le jumeau du contrat dans HQ**
+(`P00.5`, dernière moitié — dépôt tiers).
 
 **2026-09-09 — quatre arbitrages rendus par le PO** (`A1`–`A3`, `B`). Ce qui en
 sort :

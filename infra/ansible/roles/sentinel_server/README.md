@@ -164,4 +164,17 @@ cd infra/ansible && ansible-playbook playbooks/01_server.yml --check --diff
 trois semaines. Un `--check` en échec sur ce nœud n'est pas forcément un défaut
 du playbook, et **ne pas conclure vert** sans l'avoir joué pour de bon.
 
+### Ce que le premier `--check` ne prouve pas
+
+Sur un hôte où le moteur n'a jamais été posé, `--check` n'installe rien : donc
+`wazuh-manager.service` n'existe pas encore, et la tâche qui garantit
+« ni activée ni démarrée » n'a **aucune unité à vérifier**. Le rôle ne s'arrête
+pas dessus (`P01.15`) — il l'inscrit au bilan, avec la phrase qui compte :
+
+> Ce `--check` ne prouve donc PAS que le moteur restera à l'arrêt.
+
+C'est à l'`apply` que la garantie se mesure. Et si l'unité manque **après** un
+apply réel, le rôle refuse de poursuivre plutôt que de rendre `ok` : une unité
+jamais vue ne peut pas avoir été laissée à l'arrêt.
+
 ⚠️ **Aucun `apply` sans ordre PO de la session courante** (`RULES` § 2).

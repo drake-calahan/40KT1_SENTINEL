@@ -18,11 +18,26 @@
     mode: "0755"
   become: true
 
-- name: Télécharger la clé du dépôt dans un fichier temporaire
+# `/tmp` est mondialement inscriptible et un nom fixe s'y devine. La clé y
+# passait par trois opérations — écriture, relevé d'empreinte, dé-blindage —
+# avec une fenêtre entre le contrôle et l'usage. Un répertoire créé pour
+# l'occasion (`0700`, root) supprime la fenêtre plutôt que de la rétrécir.
+# `P01.16`, ouvert par la revue de `P01.1`.
+- name: Créer un répertoire temporaire privé pour la clé du dépôt
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: sentinel-repo-key.
+  become: true
+  register: sentinel_server_cle_repertoire
+  check_mode: false
+
+- name: Télécharger la clé du dépôt dans ce répertoire
   ansible.builtin.get_url:
     url: "{{ sentinel_server_repo_key_url }}"
-    dest: /tmp/sentinel-repo-key.asc
-    mode: "0644"
+    dest: "{{ sentinel_server_cle_repertoire.path }}/GPG-KEY-WAZUH"
+    owner: root
+    group: root
+    mode: "0600"
   become: true
   register: sentinel_server_cle_telechargee
   # En `--check`, `get_url` ne télécharge pas : la vérification d'empreinte qui
@@ -32,7 +47,9 @@
 
 - name: Relever l'empreinte de la clé effectivement servie
   ansible.builtin.command:
-    cmd: gpg --show-keys --with-colons /tmp/sentinel-repo-key.asc
+    cmd: >-
+      gpg --show-keys --with-colons
+      {{ sentinel_server_cle_repertoire.path }}/GPG-KEY-WAZUH
   become: true
   register: sentinel_server_empreinte_relevee
   changed_when: false
@@ -57,15 +74,16 @@
     cmd: >-
       gpg --batch --yes --dearmor
       -o /usr/share/keyrings/sentinel-wazuh.gpg
-      /tmp/sentinel-repo-key.asc
+      {{ sentinel_server_cle_repertoire.path }}/GPG-KEY-WAZUH
     creates: /usr/share/keyrings/sentinel-wazuh.gpg
   become: true
 
-- name: Retirer la clé temporaire
+- name: Retirer le répertoire temporaire de la clé
   ansible.builtin.file:
-    path: /tmp/sentinel-repo-key.asc
+    path: "{{ sentinel_server_cle_repertoire.path }}"
     state: absent
   become: true
+  when: sentinel_server_cle_repertoire.path is defined
 
 # ── 2. Le dépôt, signé par CE trousseau et par aucun autre ────────────────
 # `signed-by` est le point : sans lui, la clé posée signerait n'importe quel
@@ -143,13 +161,63 @@
     daemon_reload: true
   become: true
 
+# En `--check`, `apt` n'installe rien : l'unité n'existe pas encore, et
+# `systemd_service` échouait dessus. Le dépôt IMPOSE `--check --diff` en premier
+# geste — le contrôle obligatoire ne rendait donc jamais son verdict la première
+# fois, c'est-à-dire au seul moment où on en a besoin. `P01.15`.
+#
+# Absente ne veut pas dire la même chose des deux côtés, et c'est tout l'enjeu :
+# en `--check` c'est NORMAL (rien n'a été posé) et ça se signale ; après un
+# apply c'est un DÉFAUT (le paquet devait poser son unité) et ça échoue.
+- name: Relever si l'unité du moteur est connue de systemd
+  ansible.builtin.command:
+    cmd: systemctl list-unit-files --no-legend {{ sentinel_server_unite }}
+  become: true
+  register: sentinel_server_unite_connue
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Établir si l'unité existe
+  ansible.builtin.set_fact:
+    sentinel_server_unite_existe: >-
+      {{ sentinel_server_unite in (sentinel_server_unite_connue.stdout | default('')) }}
+
 - name: S'assurer que le moteur n'est ni activé ni démarré
   ansible.builtin.systemd_service:
     name: "{{ sentinel_server_unite }}"
     enabled: false
     state: stopped
   become: true
-  when: not (sentinel_server_enabled | bool)
+  when:
+    - not (sentinel_server_enabled | bool)
+    - sentinel_server_unite_existe | bool
+
+- name: Signaler que l'unité n'existe pas encore — attendu en `--check`
+  ansible.builtin.set_fact:
+    sentinel_server_points_signales: >-
+      {{ sentinel_server_points_signales + [
+           "Unité " ~ sentinel_server_unite ~ " ABSENTE : en --check, apt n'a "
+           ~ "rien installé, donc systemd ne connaît pas encore l'unité. NON "
+           ~ "JOUÉ ici : « ni activée ni démarrée » se vérifiera à l'apply. "
+           ~ "Ce --check ne prouve donc PAS que le moteur restera à l'arrêt."
+         ] }}
+  when:
+    - not sentinel_server_unite_existe | bool
+    - ansible_check_mode
+
+- name: Refuser de continuer si l'unité manque APRÈS une pose réelle
+  ansible.builtin.fail:
+    msg: >-
+      L'unité {{ sentinel_server_unite }} est absente alors que le paquet
+      {{ sentinel_server_paquet }} vient d'être installé pour de bon (hors
+      --check). Le paquet n'a pas posé son unité, ou son nom a changé de version
+      en version. On NE POURSUIT PAS : la suite du rôle croirait avoir garanti
+      « ni activée ni démarrée » sur une unité qu'elle n'a jamais vue, et c'est
+      exactement le faux vert que .agent/RULES.md § 1 interdit.
+  when:
+    - not sentinel_server_unite_existe | bool
+    - not ansible_check_mode
 
 # ── 5. La configuration, rendue depuis un template ────────────────────────
 - name: Rendre la configuration du manager

@@ -60,6 +60,24 @@ partie, toujours.**
 >
 > **Aucun de ces six ne se coche avant le vert de la CI sur la PR.**
 >
+> **2026-09-09, quatrième temps — quatre des six sont cochés.** La PR #9 est
+> fusionnée et les quatre contrôles sont verts sur `main` (`c512271`) :
+> `P01.6`, `P02.2`, `P03.6` et `P03.1` n'attendaient que ça. **`P01.0` et
+> `P01.4` restent `[~]`** — leur condition n'était pas le vert de la CI mais un
+> `--check --diff` réel sur la machine, et aucune machine n'a été touchée. La
+> distinction n'est pas administrative : ce sont exactement les deux lots qui
+> exécutent du privilégié sur `patator-standby`.
+>
+> **Revue de la PR #13 (`P01.1`, `cursor`) le 2026-09-09** — quatre corrections
+> demandées, aucune de fond : la clé d'enrôlement passée en argument de ligne de
+> commande (donc lisible dans `/proc` par tout utilisateur local, alors que
+> `sentinel_server` pose déjà le secret dans un fichier), `<active-response>`
+> absent au lieu d'être explicitement désactivé (sur un **agent**, l'omission
+> vaut `disabled=no` — l'inverse du manager), un `assert` de secours rendu
+> inatteignable par un `| first` sur `None`, et le port des événements écrit en
+> dur. Deux défauts **hérités de `sentinel_server`** en sortent, et ne sont pas
+> à la charge de ce lot : `P01.15` et `P01.16`, ci-dessous.
+>
 > **2026-09-09, troisième temps — les PR #10, #11 et #12 sont fusionnées.**
 > `P01.2` (règles d'intégrité) a été relue, **trois corrections demandées**,
 > **rendues par `cursor` et fusionnées** (détail sur la ligne `P01.2`). Deux
@@ -82,8 +100,12 @@ partie, toujours.**
 >   petit et indépendant, si `P01.1` attend une réponse : **`P00.11`** (garde
 >   `garde-armement` élargie aux formes booléennes) — zone `.github/`, aucune
 >   collision.
-> - `claude` → `P01.10` **relevé rendu** (l'arbitrage est au PO) ; ensuite
->   `P01.3`, qui attend `P01.1`.
+> - `claude` → `P01.10` **tranché** (issue B, `4.14.7`). Ensuite, et dans cet
+>   ordre : **`P01.15`** et **`P01.16`** (les deux suites de la revue de
+>   `P01.1`, à jouer sur les *deux* rôles à la fois — ce sont les seules tâches
+>   de `claude` qui ne dépendent ni d'une machine ni d'un arbitrage), puis
+>   `P01.3`, qui attend toujours qu'un agent existe. `P01.14` et `P03.9` se
+>   mesurent sur la machine ; `P00.5` attend un dépôt tiers.
 >
 > **Plus bloqué** : plus rien côté décisions — les trois ADR sont *Acceptées* et
 > l'amorce est sur `main`.
@@ -201,6 +223,53 @@ partie, toujours.**
       et aux comptes humains du parc, puis **rejouer le cas** : toucher un
       `authorized_keys` de `root` doit produire un événement.
 
+## Suites de la revue de `P01.1` — ouvertes le 2026-09-09
+
+> Relevées en relisant la PR #13 (`cursor`, rôle `sentinel_agent`, tête
+> `1ca33be`). **Les quatre corrections demandées restent sur la PR** : elles
+> appartiennent au lot et se rendent avant la fusion. Les deux entrées
+> ci-dessous sont d'une autre nature — ce sont des défauts que
+> `sentinel_agent` a **hérités** de `sentinel_server`, en le copiant fidèlement
+> comme le gabarit le demande. Les corriger dans le seul rôle agent créerait
+> une divergence entre deux rôles jumeaux ; ils se traitent donc ensemble, et
+> par `claude`, à qui `sentinel_server` appartient.
+>
+> *Ce que la revue enseigne au passage* : un gabarit propage aussi ses défauts.
+> C'est le prix du gabarit, et il vaut le coup — mais il impose de relire le
+> modèle quand on relit la copie.
+
+- [~] **P01.15** (claude, 2026-09-09) **Le premier geste imposé par le dépôt
+      échouait sur un hôte vierge.** `RULES` et `AGENTS` imposent
+      `--check --diff` avant tout `apply`. Or, dans les deux rôles, la tâche
+      « s'assurer que l'unité n'est ni activée ni démarrée » interroge
+      `wazuh-manager.service` / `wazuh-agent.service` alors qu'en `--check`
+      `apt` n'a rien installé : l'unité n'existe pas et `systemd_service`
+      échoue. Le `--check` obligatoire ne rendait donc **pas** son verdict la
+      première fois — le seul moment où on en a réellement besoin.
+      `99_desinstallation.yml` connaissait déjà la parade (`failed_when:
+      false`), mais elle n'est pas au bon endroit : ici il faut **distinguer**
+      « unité absente parce que `--check` n'a rien posé » (normal, à signaler)
+      de « unité absente après un apply » (défaut).
+      **Fait dans `sentinel_server`** : l'unité est relevée par
+      `systemctl list-unit-files` avant d'être touchée ; absente en `--check`,
+      elle entre au bilan avec ce qu'elle ne prouve pas (« ce `--check` ne
+      prouve donc PAS que le moteur restera à l'arrêt ») ; absente hors
+      `--check`, le rôle **refuse de poursuivre**. **Reste la moitié agent** —
+      elle ne s'écrit pas tant que la PR #13 est ouverte, sous peine de
+      réécrire sous les pieds de `cursor`. À reprendre à sa fusion.
+- [~] **P01.16** (claude, 2026-09-09) **La clé du dépôt transitait par un
+      chemin prévisible de `/tmp`.** Les deux rôles téléchargeaient la clé GPG
+      dans `/tmp/sentinel-repo-key.asc` / `/tmp/sentinel-agent-repo-key.asc` en
+      `0644`, relevaient son empreinte, puis la dé-blindaient — trois
+      opérations sur un fichier à nom fixe dans un répertoire mondialement
+      inscriptible. La fenêtre entre le contrôle d'empreinte et l'usage est
+      étroite, et la menace n° 2 du classement `B1` est précisément celle-là.
+      **Fait dans `sentinel_server`** : `ansible.builtin.tempfile` crée un
+      répertoire `0700` appartenant à `root`, la clé y est écrite en `0600`
+      `root:root`, et c'est le **répertoire** qui est retiré à la fin. La
+      fenêtre n'est pas rétrécie, elle est supprimée : le chemin n'est plus
+      devinable. **Reste la moitié agent**, à la fusion de la PR #13.
+
 ## Phase 1 — Observation seule
 
 > **Débloquée** : `ADR-003` est *Acceptée* (2026-09-07). Aucune alerte poussée,
@@ -211,7 +280,7 @@ partie, toujours.**
       protocole et journal des faux positifs, avec le troisième état
       `indeterminee` — [brief](briefs/P01.7-instrumentation-observation.md).
       *Non bloqué par `ADR-003` : aucun fichier de machine.*
-- [~] **P01.6** (claude, 2026-09-09) **Gabarit de rôle Ansible** :
+- [x] **P01.6** (claude, 2026-09-09) **Gabarit de rôle Ansible** :
       [`roles/GABARIT.md`](../infra/ansible/roles/GABARIT.md) (le contrat) +
       [`roles/gabarit/`](../infra/ansible/roles/gabarit/) (le squelette à
       copier) ; garde `*_enabled` **de type** (une chaîne `"false"` est vraie en
@@ -220,9 +289,13 @@ partie, toujours.**
       de rôle **et** bilan de play ; **garde de cible** contre le play qui vise
       zéro hôte ; [`playbooks/00_check.yml`](../infra/ansible/playbooks/00_check.yml)
       en lecture seule ; groupe `sentinel_server` rempli (`patator-standby`,
-      `ADR-003`). `yamllint` vert au réglage de la CI ; **`ansible-lint` non
-      joué en local** (non installable sur le poste Windows) — il tranche en CI.
-      Ne se coche qu'au vert de la CI sur la PR.
+      `ADR-003`). `yamllint` vert au réglage de la CI ; **`ansible-lint` non joué en
+      local** (non installable sur le poste Windows) — il tranchait en CI, et il
+      a tranché : `Ansible & YAML Lint` **vert sur `main`** (`c512271`,
+      2026-09-09), PR #9 fusionnée. Le gabarit a depuis servi deux fois —
+      `sentinel_bornage`, puis le `sentinel_agent` de `P01.1` écrit par un autre
+      agent — et les deux s'y sont tenus sans qu'il faille l'amender. C'est la
+      seule preuve qui comptait pour un gabarit.
 - [~] **P01.0** (claude, 2026-09-09) Rôle `sentinel_server` + playbook
       `01_server.yml` — manager seul (**profil frugal** refusé de continuer si
       un indexeur ou une console est présent), version **épinglée par apt *et*
@@ -344,7 +417,7 @@ semaines de suite. Chiffré, mesuré, écrit — pas « ça a l'air calme ».
 - [ ] **P02.1** (cursor) Grille de sévérité calquée sur `watchdog.py` + la
       sévérité `critique` et ses trois cas (`F2`) —
       [brief](briefs/P02.1-grille-severite.md).
-- [~] **P02.2** (claude, 2026-09-09) Paquet `bruit/` — le moteur de bruit, écrit
+- [x] **P02.2** (claude, 2026-09-09) Paquet `bruit/` — le moteur de bruit, écrit
       **avant le premier week-end** comme `P01` l'exige, pas après. Alerte à la
       **transition** et non à l'état ; agrégation sur fenêtre de 15 min où **le
       compteur EST l'information** (« 143 fois en 15 min » se lit, 143 messages
@@ -355,7 +428,8 @@ semaines de suite. Chiffré, mesuré, écrit — pas « ça a l'air calme ».
       corrige, le silence ne se remarque pas). Aucun booléen dans le paquet :
       impossible d'y écrire « pas ko, donc ok ». Moteur **pur** — l'instant est
       un argument, pas une horloge : les tests couvrent un week-end en 50 ms.
-      13 tests, 120 verts au total.
+      13 tests, 120 verts au total ; **127 verts et `ruff` vert au relevé du
+      2026-09-09 sur `main`**, PR #9 fusionnée.
       *N'envoie rien* : le câblage Discord/ntfy est `P02.0`, et sa première
       exigence reste la preuve d'arrivée sur le téléphone.
 
@@ -373,7 +447,7 @@ alerte réelle traitée de bout en bout.
       **et** refus), dégel tracé. 36 tests, dont les quatre refus obligatoires et
       les cas de dégradation. `ruff` + `pytest` verts. **Aucun geste privilégié :
       rien ne peut être joué.**
-- [~] **P03.6** (claude, 2026-09-09) `responder/gestes/` — les quatre gestes
+- [x] **P03.6** (claude, 2026-09-09) `responder/gestes/` — les quatre gestes
       armables, **chacun rendant la commande exacte qui le défait**, avec ses
       valeurs, jusqu'au journal (`ADR-062` : défaire *sans arbitrage* ; laisser
       l'exploitant retrouver la commande à 3 h du matin **est** de l'arbitrage).
@@ -415,7 +489,7 @@ alerte réelle traitée de bout en bout.
       **des deux côtés** pour autoriser le retrait depuis l'arborescence de HQ ·
       restreindre l'autorisation à des sous-chemins nommés. Ne se tranche pas
       dans un module Python.
-- [~] **P03.1** (claude, 2026-09-09) `responder/relais.py` — le mécanisme de
+- [x] **P03.1** (claude, 2026-09-09) `responder/relais.py` — le mécanisme de
       réponse active du moteur sert de **transport**, et rien d'autre. Le relais
       **extrait** trois champs et les passe à l'exécuteur ; il ne consulte ni le
       catalogue, ni le budget, ni le mode tournoi, ni le témoin de désarmement.
@@ -427,6 +501,9 @@ alerte réelle traitée de bout en bout.
       le moteur : nos gestes portent leur propre retour arrière, tracé au
       journal, et une annulation externe serait un second chemin invisible.
       19 tests, presque tous sur des refus. 107 tests verts au total.
+      **Fusionné (PR #9), CI verte sur `main`.** Ce que le relais *comprend*
+      n'est toujours pas confronté à ce que le moteur *envoie* — c'est `P03.9`,
+      et c'est une porte d'armement, pas une finition.
 - [ ] **P03.9** (claude) Confirmer la forme réelle de l'enveloppe de réponse
       active **contre la version du moteur effectivement installée**
       (`sentinel_server_wazuh_version`). `responder/relais.py` lit aujourd'hui un
