@@ -340,7 +340,7 @@ partie, toujours.**
       de service de production déclenché par le rôle —
       [brief](briefs/P01.1-role-sentinel-agent.md). Inclut les suites `P01.11` et
       `P01.12` (alignement `sentinel_fim_realtime_paths`).
-- [ ] **P01.8** (cursor) Règles authentification et événements Docker —
+- [~] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
       [brief](briefs/P01.8-regles-auth-docker.md).
 - [ ] **P01.3** (claude) Règle **anti-rafale** pour la perte de contact d'un
       agent. **Le noyau est livré** (`bruit/`, voir `P02.2`) et le cas du standby

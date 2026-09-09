@@ -1,0 +1,31 @@
+<!--
+  P01.8 — SSH : rafale d'échecs et connexion depuis source inconnue.
+  Journaux lus : /var/log/auth.log (localfile syslog, rôle sentinel_agent).
+  Sources connues (phase 1, liste écrite — pas d'apprentissage auto) :
+    · tailnet Tailscale tail29e268.ts.net → plage CGNAT 100.64.0.0/10
+    · LAN secours 192.168.1.0/24
+  Exclusions level 0 = enfants de la règle d'alerte visée.
+-->
+<group name="syslog,sshd,sentinel,authentification,ssh,">
+
+  <!--
+    Attrape huit échecs d'authentification SSH depuis la même adresse IP en deux minutes.
+    Un balayage Internet ordinaire ferait crier à tort — ici le nœud n'est joignable que par le tailnet et le LAN.
+  -->
+  <rule id="100201" level="8" frequency="8" timeframe="120">
+    <if_matched_sid>5710,5716,5718</if_matched_sid>
+    <same_source_ip />
+    <description>Authentification (orange) : rafale d'échecs SSH depuis une même source</description>
+  </rule>
+
+  <!--
+    Attrape toute connexion SSH réussie dont l'adresse source n'est ni tailnet (100.64.0.0/10) ni LAN secours (192.168.1.0/24).
+    Une nouvelle machine du PO ou une adresse tailnet nouvelle non encore inscrite ici peut déclencher à tort — mettre à jour la liste.
+  -->
+  <rule id="100202" level="14">
+    <if_sid>5715</if_sid>
+    <field name="srcip" type="pcre2">^(?!100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|192\.168\.1\.|127\.)</field>
+    <description>Authentification (critique) : connexion SSH réussie depuis une source jamais vue</description>
+  </rule>
+
+</group>

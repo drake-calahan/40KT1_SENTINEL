@@ -1,0 +1,122 @@
+<!--
+  P01.8 — Événements Docker lus par docker-listener (wodle, rôle sentinel_agent).
+  Stack de production : projet Compose fortyk (fortyk-caddy, fortyk-db, fortyk-api,
+  fortyk-cloudflared, fortyk-scraper). Sentinelle lit le démon, ne le configure pas (HQ).
+  Images connues (phase 1, liste écrite) : caddy · postgres/postgis · fortyk · cloudflared · scraper · wazuh.
+  Exclusions level 0 = enfants de la règle d'alerte visée.
+-->
+<group name="docker,sentinel,">
+
+  <!--
+    Attrape un conteneur créé ou démarré avec l'attribut privileged=true.
+    Aucun conteneur de la stack fortyk n'est privilégié — un lancement manuel d'outil d'exploitation peut déclencher à tort si mal nommé.
+  -->
+  <rule id="100301" level="11">
+    <if_sid>87902,87903</if_sid>
+    <field name="docker.Actor.Attributes.privileged">true</field>
+    <description>Docker (rouge) : conteneur lancé en mode privilégié</description>
+  </rule>
+
+  <!--
+    Attrape un montage du socket /var/run/docker.sock dans un conteneur (create ou start).
+    Un outil d'exploitation lancé à la main peut déclencher à tort si le nom du conteneur ressemble à la stack.
+  -->
+  <rule id="100302" level="11">
+    <if_sid>87902,87903</if_sid>
+    <regex type="pcre2">docker\.sock</regex>
+    <description>Docker (rouge) : socket Docker monté dans un conteneur</description>
+  </rule>
+
+  <!--
+    Attrape une publication de port sur 0.0.0.0 (joignable depuis le LAN malgré ufw — DISCOVERY.md).
+    Un redémarrage Compose qui republie un port peut déclencher à tort lors d'un déploiement git pull + docker compose up.
+  -->
+  <rule id="100303" level="11">
+    <if_sid>87902,87903</if_sid>
+    <regex type="pcre2">0\.0\.0\.0:\d+</regex>
+    <description>Docker (rouge) : port publié sur 0.0.0.0</description>
+  </rule>
+
+  <!--
+    Attrape un docker exec (exec_start) dans un conteneur de production fortyk (hors scraper).
+    Un dépannage du PO via docker exec est fréquent et peut déclencher à tort — c'est voulu (orange, à agréger).
+  -->
+  <rule id="100304" level="8">
+    <if_sid>87901</if_sid>
+    <field name="docker.Action">exec_start</field>
+    <field name="docker.Actor.Attributes.name" type="pcre2">^fortyk-(caddy|db|api|cloudflared)-</field>
+    <description>Docker (orange) : docker exec dans un conteneur de production</description>
+  </rule>
+
+  <!--
+    Attrape le démarrage d'un conteneur dont l'image n'appartient pas à la liste connue du parc.
+    Un déploiement qui tire une image nouvelle peut déclencher à tort — exclusion compose fortyk ci-dessous.
+  -->
+  <rule id="100305" level="8">
+    <if_sid>87903</if_sid>
+    <field name="docker.from" type="pcre2">^(?!.*/?(caddy|postgres|postgis|cloudflared|fortyk|scraper|wazuh))</field>
+    <description>Docker (orange) : image inconnue démarrée</description>
+  </rule>
+
+  <!--
+    Exclusion : republication de ports lors d'un docker compose up de la stack fortyk.
+    Motif : déploiement git pull + docker compose up recrée les conteneurs avec leurs mappings habituels.
+  -->
+  <rule id="100351" level="0">
+    <if_sid>100303</if_sid>
+    <field name="docker.Actor.Attributes.com.docker.compose.project">^fortyk$</field>
+    <description>Exclusion : port 0.0.0.0 lors d'un docker compose up (déploiement git pull)</description>
+  </rule>
+
+  <!--
+    Exclusion : fenêtre horaire de la sauvegarde offsite quotidienne.
+    Motif : sauvegarde de 03:30 — arrêts ou recréations de conteneurs attendus pendant la fenêtre.
+  -->
+  <rule id="100352" level="0">
+    <if_sid>100301,100302,100303,100304,100305</if_sid>
+    <time>3:00 am - 4:00 am</time>
+    <description>Exclusion : fenêtre sauvegarde offsite de 03:30</description>
+  </rule>
+
+  <!--
+    Exclusion : mirror-sync nocturne sur patator-standby.
+    Motif : le standby restaure la stack fortyk chaque nuit — recréation de conteneurs attendue.
+  -->
+  <rule id="100353" level="0">
+    <if_sid>100301,100302,100303,100305</if_sid>
+    <hostname>patator-standby</hostname>
+    <time>1:00 am - 5:00 am</time>
+    <description>Exclusion : mirror-sync nocturne du standby</description>
+  </rule>
+
+  <!--
+    Exclusion : image nouvelle lors d'un docker compose up du projet fortyk.
+    Motif : déploiement git pull + docker compose up tire parfois une image tag mise à jour.
+  -->
+  <rule id="100356" level="0">
+    <if_sid>100305</if_sid>
+    <field name="docker.Actor.Attributes.com.docker.compose.project">^fortyk$</field>
+    <description>Exclusion : image nouvelle lors d'un docker compose up (déploiement git pull)</description>
+  </rule>
+
+  <!--
+    Exclusion : activité normale du conteneur ingest scraper.
+    Motif : l'ingest recrée parfois des exec ou redémarre avec une image tag local — bruit métier attendu.
+  -->
+  <rule id="100354" level="0">
+    <if_sid>100304,100305</if_sid>
+    <field name="docker.Actor.Attributes.name" type="pcre2">^fortyk-scraper-</field>
+    <description>Exclusion : activité normale du conteneur ingest scraper</description>
+  </rule>
+
+  <!--
+    Exclusion : événements Docker déclenchés par unattended-upgrades (redémarrage démon ou conteneurs).
+    Motif : nuit de mise à jour — le démon Docker peut recréer des conteneurs sans changement de politique.
+  -->
+  <rule id="100355" level="0">
+    <if_sid>100301,100302,100303,100304,100305</if_sid>
+    <match>unattended-upgrades|apt-daily</match>
+    <description>Exclusion : événements Docker liés à unattended-upgrades</description>
+  </rule>
+
+</group>

@@ -1,0 +1,48 @@
+<!--
+  P01.8 — sudo et sessions root interactives.
+  Journaux lus : /var/log/auth.log (localfile syslog, rôle sentinel_agent).
+  Comptes sudo attendus (maintenance PO / Ansible) : calahan, root.
+  Exclusions level 0 = enfants de la règle d'alerte visée.
+-->
+<group name="syslog,sudo,pam,sentinel,authentification,">
+
+  <!--
+    Attrape toute élévation sudo réussie par un compte hors calahan et root.
+    Une maintenance Ansible ou une session du PO sous calahan peut encore déclencher si le champ user diffère (sudo.ws, alias).
+  -->
+  <rule id="100203" level="11">
+    <if_sid>5402,5407</if_sid>
+    <field name="user" type="pcre2">^(?!calahan$|root$)</field>
+    <description>Authentification (rouge) : élévation sudo par un compte inattendu</description>
+  </rule>
+
+  <!--
+    Attrape trois échecs consécutifs d'élévation sudo pour un même utilisateur (règle mère Wazuh 5404).
+    Un mot de passe saisi de travers ou un script mal écrit peut déclencher à tort lors d'un dépannage.
+  -->
+  <rule id="100204" level="8">
+    <if_sid>5404</if_sid>
+    <description>Authentification (orange) : échecs d'élévation sudo répétés</description>
+  </rule>
+
+  <!--
+    Exclusion : échecs sudo du compte système _apt lors des mises à jour nocturnes.
+    Motif : unattended-upgrades tente parfois des élévations qui échouent sans être une attaque.
+  -->
+  <rule id="100251" level="0">
+    <if_sid>100204</if_sid>
+    <field name="user">^_apt$</field>
+    <description>Exclusion : échecs sudo _apt (unattended-upgrades)</description>
+  </rule>
+
+  <!--
+    Attrape une session interactive ouverte pour root (SSH direct, su ou sudo -i).
+    Un dépannage du PO en root est légitime — à consigner, jamais à ignorer.
+  -->
+  <rule id="100205" level="11">
+    <if_sid>5715,5501</if_sid>
+    <field name="dstuser">^root$</field>
+    <description>Authentification (rouge) : session root interactive</description>
+  </rule>
+
+</group>
