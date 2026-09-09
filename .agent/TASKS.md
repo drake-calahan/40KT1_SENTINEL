@@ -179,9 +179,12 @@ partie, toujours.**
 - [ ] **P01.8** (cursor) Règles authentification et événements Docker —
       [brief](briefs/P01.8-regles-auth-docker.md).
 - [ ] **P01.3** (claude) Règle **anti-rafale** pour la perte de contact d'un
-      agent — écrite **avant** le premier week-end, pas après. Motif : le défaut
-      réseau récidivant de `patator-standby` (4 occurrences connues). Livre le
-      noyau du moteur de bruit, généralisé en `P02.2`.
+      agent. **Le noyau est livré** (`bruit/`, voir `P02.2`) et le cas du standby
+      est rejoué en test : 6 h de panne sondée à la minute → **25 alertes au lieu
+      de 360**, et les quatre épisodes connus restent quatre ouvertures
+      distinctes. **Reste à câbler la règle de détection elle-même**
+      (`rules/agents/`) sur la sonde de contact — cela demande un agent qui
+      existe, donc `P01.1`.
 - [~] **P01.4** (claude, 2026-09-09) Rôle `sentinel_bornage` — les deux
       conditions vérifiables d'`ADR-003`, avec deux régimes **différents** :
       le **plafond** `cgroup` est une contrainte (posé sans garde, appliqué à
@@ -217,8 +220,20 @@ semaines de suite. Chiffré, mesuré, écrit — pas « ça a l'air calme ».
 - [ ] **P02.1** (cursor) Grille de sévérité calquée sur `watchdog.py` + la
       sévérité `critique` et ses trois cas (`F2`) —
       [brief](briefs/P02.1-grille-severite.md).
-- [ ] **P02.2** (claude) Agrégation par fenêtre de 15 min avec compteur (`F3`) —
-      généralisation du moteur de bruit livré en `P01.3`.
+- [~] **P02.2** (claude, 2026-09-09) Paquet `bruit/` — le moteur de bruit, écrit
+      **avant le premier week-end** comme `P01` l'exige, pas après. Alerte à la
+      **transition** et non à l'état ; agrégation sur fenêtre de 15 min où **le
+      compteur EST l'information** (« 143 fois en 15 min » se lit, 143 messages
+      apprennent à ignorer le canal — et c'est l'alerte *suivante* qu'on perd) ;
+      `inconnu` a ses propres transitions, et passer de `ko` à `inconnu` n'est
+      **pas** un retour à la normale ; la sévérité ne redescend jamais seule ;
+      une sévérité non reconnue est traitée comme la **plus haute** (le bruit se
+      corrige, le silence ne se remarque pas). Aucun booléen dans le paquet :
+      impossible d'y écrire « pas ko, donc ok ». Moteur **pur** — l'instant est
+      un argument, pas une horloge : les tests couvrent un week-end en 50 ms.
+      13 tests, 120 verts au total.
+      *N'envoie rien* : le câblage Discord/ntfy est `P02.0`, et sa première
+      exigence reste la preuve d'arrivée sur le téléphone.
 
 **Critère de sortie** : une alerte de test reçue sur les deux canaux, et une
 alerte réelle traitée de bout en bout.
