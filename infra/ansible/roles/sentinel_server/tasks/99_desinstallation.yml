@@ -1,0 +1,80 @@
+---
+# Désinstallation du serveur central.
+#
+# ADR-001 compte la « désinstallation par le rôle Ansible » parmi les propriétés
+# qui rendent le choix du moteur RÉVERSIBLE. Une réversibilité qu'aucun rôle ne
+# sait exécuter n'est qu'une phrase — d'où ce fichier.
+#
+#   ansible-playbook playbooks/01_server.yml -e '{"sentinel_server_desinstaller": true}'
+#
+# Deux gestes DISTINCTS, et c'est délibéré :
+#   - retirer le LOGICIEL (ce fichier, par défaut) ;
+#   - détruire l'ÉTAT — journaux, base des agents — en plus
+#     (`sentinel_server_purger_etat: true`).
+# Les journaux de sécurité décrivent l'infrastructure entière : chemins,
+# comptes, horaires, empreintes (`RULES` § 4). Les effacer est une décision, pas
+# une étape de nettoyage.
+
+- name: Arrêter et désactiver le serveur central
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_server_unite }}"
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false  # l'unité peut déjà ne plus exister : ce n'est pas un échec
+
+- name: Lever le gel de version
+  ansible.builtin.dpkg_selections:
+    name: "{{ sentinel_server_paquet }}"
+    selection: install
+  become: true
+  failed_when: false
+
+- name: Retirer le paquet du moteur
+  ansible.builtin.apt:
+    name: "{{ sentinel_server_paquet }}"
+    state: absent
+    purge: "{{ sentinel_server_purger_etat | bool }}"
+  become: true
+
+- name: Retirer le dépôt de paquets et son épinglage
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/sentinel-wazuh.list
+    - /etc/apt/sources.list.d/sentinel-wazuh.sources
+    - /etc/apt/preferences.d/sentinel-wazuh.pref
+    - /usr/share/keyrings/sentinel-wazuh.gpg
+  become: true
+
+# Le drop-in de bornage est posé par `P01.4`. Le retirer ici plutôt que là-bas
+# évite de laisser un fragment de configuration qui s'appliquerait à une
+# réinstallation future sans que personne ne l'ait voulu.
+- name: Retirer le bornage des ressources
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ sentinel_server_unite }}.d"
+    state: absent
+  become: true
+
+- name: Recharger le gestionnaire de services
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+# ── L'état : détruit UNIQUEMENT sur demande explicite ─────────────────────
+- name: Détruire l'état du serveur central (journaux, base des agents)
+  ansible.builtin.file:
+    path: "{{ sentinel_server_ossec_dir }}"
+    state: absent
+  become: true
+  when: sentinel_server_purger_etat | bool
+
+- name: Bilan de désinstallation
+  ansible.builtin.debug:
+    msg:
+      - "hôte    : {{ inventory_hostname }}"
+      - "logiciel: retiré ({{ sentinel_server_paquet }}), dépôt et épinglage retirés"
+      - "état    : {{ 'DÉTRUIT — journaux et base des agents effacés' if sentinel_server_purger_etat | bool else 'CONSERVÉ dans ' ~ sentinel_server_ossec_dir ~ ' — le retirer est un geste séparé' }}"
+      - "agents  : les agents des nœuds pointent toujours vers cet hôte. Les ré-enrôler ou les désinstaller (P01.1) fait partie du même geste."
+      - "ACTIVE.md : mettre à jour le tableau d'armement — c'est lui qui répond à « qu'est-ce qui tourne où »."

@@ -1,0 +1,110 @@
+---
+# Armement du serveur central.
+#
+# ══ ON N'ARRIVE ICI QUE PAR UN GESTE HUMAIN ════════════════════════════════
+#   ansible-playbook playbooks/01_server.yml -e '{"sentinel_server_enabled": true}'
+# joué en déroulant un runbook. Jamais par un merge, jamais par un `apply` de
+# routine (`RULES` § 1).
+#
+# Armer le SERVEUR n'arme aucune réponse : le catalogue reste fermé et
+# l'exécuteur n'est pas câblé (`P03.x`). Ce qu'on arme ici, c'est l'écoute et
+# la collecte — la première ligne du tableau d'armement d'ACTIVE.md.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Le désarmement d'urgence est un frein hors bande : SSH et un `touch`. Il est
+# lu ICI, au dernier moment — entre la garde et l'armement, quelqu'un a pu le
+# poser.
+- name: Lire le témoin de désarmement d'urgence
+  ansible.builtin.stat:
+    path: "{{ sentinel_disarm_file }}"
+  register: sentinel_server_temoin_desarmement
+  become: true
+  failed_when: false
+  changed_when: false
+
+- name: Refuser d'armer si le témoin est présent, ou si on n'a pas pu le lire
+  ansible.builtin.fail:
+    msg: >-
+      {{
+        'ARMEMENT REFUSÉ : le témoin de désarmement ' ~ sentinel_disarm_file
+        ~ ' est PRÉSENT. Quelqu\'un l\'a posé ; il se retire par le même geste, '
+        ~ 'à la main, jamais par un playbook.'
+        if ('stat' in sentinel_server_temoin_desarmement
+            and sentinel_server_temoin_desarmement.stat.exists)
+        else
+        'ARMEMENT REFUSÉ : le témoin de désarmement ' ~ sentinel_disarm_file
+        ~ ' n\'a pas pu être LU. État inconnu — et un `ok` n\'est pas un '
+        ~ '`inconnu` (.agent/RULES.md § 1). On n\'arme pas sur une mesure '
+        ~ 'qu\'on n\'a pas pu prendre.'
+      }}
+  when: >-
+    'stat' not in sentinel_server_temoin_desarmement
+    or sentinel_server_temoin_desarmement.stat.exists
+
+# Le bornage est la condition 1 d'ADR-003. Armer sans lui fait cohabiter le
+# moteur avec le miroir Postgres et la relève SANS plafond mémoire, sur 16 Go.
+# La condition serait alors déclarative — exactement ce qu'ADR-003 refuse.
+- name: Refuser d'armer sans bornage des ressources
+  ansible.builtin.fail:
+    msg: >-
+      ARMEMENT REFUSÉ : le bornage cgroup n'est pas posé
+      (/etc/systemd/system/{{ sentinel_server_unite }}.d/sentinel-bornage.conf).
+      C'est la condition 1 d'ADR-003, et elle n'est pas négociable sur cet hôte :
+      le standby porte le miroir Postgres et la relève en lecture seule sur
+      16 Go. Jouer d'abord le lot P01.4, puis revenir armer.
+  when: >-
+    'stat' not in sentinel_server_bornage
+    or not sentinel_server_bornage.stat.exists
+
+- name: Activer et démarrer le serveur central
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_server_unite }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+# ── La vérification qui rend la condition 3 d'ADR-003 vérifiable ──────────
+# « Écoute sur tailscale0 uniquement » ne vaut que si on le MESURE. On le
+# mesure ici, après démarrage, et on échoue si une socket du moteur écoute
+# ailleurs — y compris sur 0.0.0.0, qui couvre le LAN.
+- name: Relever les sockets en écoute du moteur
+  ansible.builtin.command:
+    cmd: ss -lntpH
+  become: true
+  register: sentinel_server_sockets
+  changed_when: false
+  # En `--check`, l'unité n'a pas été démarrée : la mesure n'a pas de sens.
+  # On ne la simule pas — on l'annonce non prise (voir le bilan).
+  when: not ansible_check_mode
+
+- name: Aucune socket du moteur n'écoute hors du tailnet
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_sockets.stdout_lines
+        | select('search', 'wazuh')
+        | reject('search', sentinel_server_listen_ip | regex_escape)
+        | list | length == 0
+    fail_msg: >-
+      ÉCOUTE HORS TAILNET détectée. Une socket du moteur écoute sur autre chose
+      que {{ sentinel_server_listen_ip }} ({{ sentinel_server_listen_interface }}) :
+      {{ sentinel_server_sockets.stdout_lines | select('search', 'wazuh') | reject('search', sentinel_server_listen_ip | regex_escape) | join(' | ') }}
+      C4 est formel — tailnet UNIQUEMENT, jamais Funnel, jamais cloudflared,
+      jamais le nom public. `ufw` ne rattrape pas cela de façon fiable : il ne
+      couvre pas les ports publiés par Docker (.agent/DISCOVERY.md). Désarmer,
+      corriger l'écoute, réarmer.
+    success_msg: >-
+      écoute : {{ sentinel_server_listen_ip }} seulement — condition 3
+      d'ADR-003 vérifiée, pas seulement déclarée
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Consigner que le serveur central a été armé
+  ansible.builtin.debug:
+    msg: >-
+      ARMÉ : {{ sentinel_server_unite }} sur {{ inventory_hostname }}, écoute
+      {{ sentinel_server_listen_ip }}. Mode tournoi lu :
+      {{ sentinel_server_mode_tournoi }}. AUCUNE réponse automatique n'est armée
+      pour autant — le catalogue reste fermé (ADR-002 § 6, cinq portes).
+      Mettre à jour le tableau d'armement de .agent/ACTIVE.md : c'est lui qui
+      répond à « qu'est-ce qui tourne sur cette machine ? ».

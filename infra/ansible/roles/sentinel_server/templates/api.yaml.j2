@@ -1,0 +1,51 @@
+{#
+  API du serveur central — 40KT1_SENTINEL, rôle `sentinel_server`.
+
+  Le point entier de ce fichier tient en une ligne : `host`. Par défaut l'API
+  écoute sur toutes les interfaces. Sur cet hôte, « toutes les interfaces »
+  inclut le LAN — et `ufw` ne rattrape pas cela de façon fiable, puisqu'il ne
+  couvre pas les ports publiés par Docker (.agent/DISCOVERY.md).
+
+  On ne compte donc pas sur le pare-feu pour tenir C4 : on lie l'API au tailnet.
+#}
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle sentinel_server).
+# Toute modification faite ici sera écrasée au prochain passage du rôle.
+# Modifier plutôt :
+#   infra/ansible/roles/sentinel_server/templates/api.yaml.j2
+#
+# Hôte : {{ inventory_hostname }}
+
+# ── Écoute : le tailnet, et rien d'autre (C4, condition 3 d'ADR-003) ────────
+# Adresse résolue sur la machine depuis l'interface {{ sentinel_server_listen_interface }}.
+# JAMAIS 0.0.0.0. Jamais Funnel, jamais cloudflared, jamais le nom public.
+host:
+  - "{{ sentinel_server_listen_ip }}"
+port: {{ sentinel_server_port_api }}
+
+# ── HTTPS ───────────────────────────────────────────────────────────────────
+# Le tailnet chiffre déjà le transport, mais l'API porte des identifiants : on
+# ne les envoie pas en clair au motif que le tunnel est sûr. Une couche qui
+# tombe ne doit pas emporter la suivante.
+https:
+  enabled: yes
+
+# ── Journalisation ──────────────────────────────────────────────────────────
+# Les accès à l'API sont tracés par hygiène (B2 : traçage des accès admin).
+logs:
+  level: info
+
+# ── Ce qui reste fermé ──────────────────────────────────────────────────────
+# Pas d'origine croisée : il n'y a pas de console web en profil frugal, donc
+# aucun navigateur n'a de raison d'appeler cette API depuis une autre origine.
+cors:
+  enabled: no
+
+# Pas de mise à jour déclenchée depuis l'API : la version du moteur est
+# épinglée dans le dépôt et gelée par apt. Une mise à jour est une décision, en
+# PR, pas un appel HTTP.
+upload_configuration:
+  remote_commands:
+    localfile:
+      allow: no
+    wodle_command:
+      allow: no

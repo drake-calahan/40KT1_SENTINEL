@@ -1,0 +1,48 @@
+---
+# Invariants du rôle `sentinel_server` — NON surchargeables par l'inventaire.
+# Ce qui est ici tient à une décision d'ADR, pas à un réglage de machine.
+# Le changer, c'est amender l'ADR (`RULES` § 2).
+
+# Préfixe obligatoire de toute unité systemd de ce dépôt (docs/contrat-hq.md).
+sentinel_server_prefixe_unites: "sentinel-"
+
+# Unités et services appartenant à 40KT1_HQ. On les LIT ; on ne les redémarre
+# jamais, on ne les reconfigure jamais. Sert au message de refus du handler.
+sentinel_server_unites_de_hq:
+  - "40kt1-*"
+  - "docker"
+  - "containerd"
+  - "tailscaled"
+  - "ssh"
+  - "ufw"
+
+# --- Ce que « profil frugal » interdit, nommément ---------------------------
+# ADR-001 : manager SEUL. Pas d'indexeur (4–5 Go), pas de console web. Sur les
+# 16 Go du standby, qui portent déjà le miroir Postgres et doivent garder de la
+# marge pour la relève, ces paquets ne sont pas « lourds » : ils ne rentrent
+# pas. Le rôle REFUSE de continuer s'il les trouve installés — sinon
+# « profil frugal » n'est qu'une intention, et l'hôte le découvre en RAM.
+sentinel_server_paquets_interdits:
+  - wazuh-indexer
+  - wazuh-dashboard
+  - opensearch
+  - opensearch-dashboards
+  - filebeat
+
+# Le seul paquet que ce rôle installe.
+sentinel_server_paquet: "wazuh-manager"
+
+# Racine d'installation du moteur, imposée par son paquet.
+sentinel_server_ossec_dir: "/var/ossec"
+sentinel_server_ossec_conf: "/var/ossec/etc/ossec.conf"
+sentinel_server_authd_pass: "/var/ossec/etc/authd.pass"
+sentinel_server_api_conf: "/var/ossec/api/configuration/api.yaml"
+
+# L'unité livrée par le paquet. Le paquet ne la préfixe pas `sentinel-` : c'est
+# un logiciel tiers, pas une unité que nous écrivons. La règle du préfixe porte
+# sur CE QUE NOUS POSONS ; ce que nous consommons est nommé par son éditeur.
+# On l'inscrit donc explicitement dans les unités autorisées, plutôt que de
+# désactiver la garde — une exception nommée se relit, une garde levée non.
+sentinel_server_unite: "wazuh-manager.service"
+sentinel_server_unites_autorisees:
+  - "wazuh-manager.service"

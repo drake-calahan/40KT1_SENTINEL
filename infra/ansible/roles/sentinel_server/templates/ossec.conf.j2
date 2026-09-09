@@ -1,0 +1,98 @@
+{#
+  Configuration du serveur central — 40KT1_SENTINEL, rôle `sentinel_server`.
+
+  PROFIL FRUGAL (ADR-001) : manager seul. Pas d'indexeur, pas de console.
+  PHASE 1 (A2, D5)        : OBSERVATION SEULE. Aucune alerte poussée, aucune
+                            réponse active. On mesure le bruit de fond.
+
+  Ce qui n'est PAS ici, et pourquoi :
+    - <active-response> : le catalogue est fermé et l'exécuteur n'est pas
+      câblé. ADR-002 § 6 pose cinq portes avant le premier geste. Un bloc de
+      réponse posé « pour plus tard » est un dispositif armé qui s'ignore.
+    - <integration> Discord/ntfy : le câblage d'alerte est le lot P02.0, et sa
+      première exigence est la PREUVE D'ARRIVÉE sur le téléphone. Poser
+      l'intégration avant la preuve, c'est croire qu'une alerte part.
+    - <indexer> / <cluster> : profil frugal, et un seul nœud.
+#}
+<!--
+  ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle sentinel_server).
+  Toute modification faite ici sera écrasée au prochain passage du rôle.
+  Modifier plutôt :
+    infra/ansible/roles/sentinel_server/templates/ossec.conf.j2
+
+  Hôte    : {{ inventory_hostname }}
+  Profil  : {{ sentinel_server_profil | default('frugal') }} — manager seul
+  Version : {{ sentinel_server_wazuh_version }} (épinglée)
+  Phase   : 1 — observation seule, aucune réponse
+-->
+<ossec_config>
+
+  <global>
+    <!-- Aucun courriel. Le canal d'alerte du parc est notify.sh (Discord +
+         ntfy), câblé en P02.0 après preuve d'arrivée sur le téléphone. -->
+    <email_notification>no</email_notification>
+    <!-- Les journaux de sécurité décrivent l'infrastructure entière : chemins,
+         comptes, horaires, empreintes. On les garde, compressés, sur place
+         (G1 : 90 jours en ligne, 12 mois d'archive) et on ne les exporte pas
+         en clair (RULES § 4). -->
+    <logall>no</logall>
+    <logall_json>yes</logall_json>
+  </global>
+
+  <!-- ══ ÉCOUTE — condition 3 d'ADR-003 (C4) ═══════════════════════════════
+       Le serveur central n'est joignable QUE par le tailnet. `local_ip` est
+       résolue sur la machine à partir des faits : la figer dans le dépôt
+       reviendrait à graver une IP de tailnet qui changera.
+       Jamais 0.0.0.0 — qui couvrirait le LAN. Jamais Funnel, jamais
+       cloudflared, jamais le nom public.
+       Vérifié à l'armement par `ss -lntp`, pas seulement déclaré ici. -->
+  <remote>
+    <connection>secure</connection>
+    <port>{{ sentinel_server_port_evenements }}</port>
+    <protocol>tcp</protocol>
+    <local_ip>{{ sentinel_server_listen_ip }}</local_ip>
+  </remote>
+
+  <!-- ══ ENRÔLEMENT ════════════════════════════════════════════════════════
+       Par mot de passe, obligatoire. `SENTINEL_ENROLL_KEY` permet d'inscrire un
+       FAUX AGENT sur le serveur central : c'est une clé privée, pas un
+       identifiant. Elle vient du .env de la machine, jamais du dépôt.
+
+       `force` désactivé : un agent déjà enrôlé n'est pas remplacé
+       silencieusement par un nouveau qui prétendrait le même nom. -->
+  <auth>
+    <disabled>no</disabled>
+    <port>{{ sentinel_server_port_enrolement }}</port>
+    <use_source_ip>no</use_source_ip>
+    <purge>no</purge>
+    <use_password>yes</use_password>
+    <ssl_verify_host>no</ssl_verify_host>
+    <ssl_auto_negotiate>no</ssl_auto_negotiate>
+    <force>
+      <enabled>no</enabled>
+    </force>
+  </auth>
+
+  <!-- ══ RÉTENTION (G1) ════════════════════════════════════════════════════
+       90 jours en ligne, 12 mois d'archive compressée. Pas de recherche
+       historique en phase 1 : c'est la dette assumée du profil frugal
+       (ADR-001), et une investigation se fait en ligne de commande. -->
+  <global>
+    <rotate_interval>1d</rotate_interval>
+    <max_output_size>50M</max_output_size>
+  </global>
+
+  <!-- ══ CE QUE LE SERVEUR NE FAIT PAS EN PHASE 1 ══════════════════════════
+       Les modules d'inventaire et de conformité sont laissés à leur défaut ;
+       les RAPPORTS hebdomadaires (D3 conformité, D4 vulnérabilités) sont le
+       lot P01.9, en LECTURE SEULE, unités livrées désarmées.
+
+       ⚠️ L'inventaire de vulnérabilités dépend du mineur retenu : voir
+       roles/sentinel_server/README.md § « La question ouverte ». À trancher
+       AVANT P01.9. -->
+
+  <!-- Aucun bloc <active-response> : la réponse ne s'écrit pas ici. Le
+       catalogue est fermé (ADR-002) et l'exécuteur décide LOCALEMENT, côté
+       nœud (E7). Le transport se câble en P03.1, après les cinq portes. -->
+
+</ossec_config>

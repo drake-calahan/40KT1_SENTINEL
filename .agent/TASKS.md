@@ -140,9 +140,34 @@ partie, toujours.**
       `ADR-003`). `yamllint` vert au réglage de la CI ; **`ansible-lint` non
       joué en local** (non installable sur le poste Windows) — il tranche en CI.
       Ne se coche qu'au vert de la CI sur la PR.
-- [ ] **P01.0** (claude) Rôle `sentinel_server` — serveur central sur l'hôte
-      tranché en `C1`, **profil frugal** (pas d'indexeur, pas de console).
-      Écoute sur `tailscale0` uniquement.
+- [~] **P01.0** (claude, 2026-09-09) Rôle `sentinel_server` + playbook
+      `01_server.yml` — manager seul (**profil frugal** refusé de continuer si
+      un indexeur ou une console est présent), version **épinglée par apt *et*
+      gelée** contre `unattended-upgrades`, clé de dépôt **vérifiée par
+      empreinte**, écoute `tailscale0` résolue depuis les faits et **mesurée par
+      `ss -lntp` à l'armement**, désinstallation jouable (état conservé, sa
+      purge est un geste séparé). Livré **désarmé** : `policy-rc.d` empêche le
+      paquet de démarrer son service à l'installation. Trois refus durs
+      d'armement — témoin de désarmement posé **ou illisible**, bornage `P01.4`
+      absent, écoute hors tailnet. Ne se coche qu'au vert de la CI **et** après
+      un `--check --diff` réel sur la machine.
+      ⚠️ **Deux prérequis avant le premier `--check`** : confirmer l'empreinte
+      de la clé de dépôt (le rôle **refuse** de tourner tant que
+      `sentinel_server_repo_key_confirmee` est `false`) et poser le `.env` avec
+      `SENTINEL_ENROLL_KEY`. Voir le [README du rôle](../infra/ansible/roles/sentinel_server/README.md).
+- [ ] **P01.10** (claude — relevé · **PO — l'arbitrage**) **`D4` et le mineur du
+      moteur.** Le détecteur de vulnérabilités de Wazuh a été redessiné au cours
+      de la série 4.x, et la version redessinée stocke ses résultats dans
+      l'**indexeur** — que le profil frugal n'installe pas (`ADR-001`). Selon le
+      mineur retenu (`4.7.5` aujourd'hui, à un seul endroit :
+      `sentinel_server_wazuh_version`), le rapport hebdomadaire de
+      vulnérabilités de `D4` est soit produisible localement, soit à produire
+      autrement. **Ce point n'est pas vérifié** — il est ouvert ici parce qu'il
+      se découvrirait sinon au milieu de `P01.9`, moteur déjà posé sur une
+      machine de production et version gelée. Relever le comportement réel,
+      puis trancher : rester sur un mineur qui s'en passe · produire `D4`
+      autrement en lecture seule · rouvrir `ADR-001` sur le profil.
+      **Bloque `P01.9`**, pas `P01.1`.
 - [ ] **P01.2** (cursor) Règles d'intégrité (`rules/integrite/`) sur la liste
       courte de `D1` — [brief](briefs/P01.2-regles-integrite.md). Fixe les plages
       d'identifiants et la correspondance sévérité ↔ niveau pour tous les lots de
@@ -162,6 +187,8 @@ partie, toujours.**
 - [ ] **P01.9** (cursor) Rapports hebdomadaires conformité (`D3`) et
       vulnérabilités (`D4`), **lecture seule**, unités `sentinel-*` livrées
       désarmées — [brief](briefs/P01.9-rapports-hebdomadaires.md).
+      ⚠️ **Bloqué par `P01.10`** : la source de `D4` dépend du mineur du moteur.
+      Ne pas démarrer ce lot avant l'arbitrage — le brief le présuppose résolu.
 - [ ] **P01.5** (PO) Période d'observation (`D5`, 14 jours) couvrant au moins un
       déploiement complet et une sauvegarde offsite. Journal des faux positifs
       tenu selon `P01.7`.

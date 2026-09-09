@@ -1,0 +1,14 @@
+---
+# Métadonnées du rôle `sentinel_server`.
+# `dependencies` vide, et volontairement : les dépendances s'écrivent dans le
+# playbook, où on les voit (roles/GABARIT.md § 1).
+
+galaxy_info:
+  author: 40KT1 — Sentinelle
+  description: >-
+    Serveur central Wazuh en profil frugal (manager seul, ni indexeur ni
+    console), écoute tailnet uniquement. Livré DÉSARMÉ. ADR-001 et ADR-003.
+  license: proprietary
+  min_ansible_version: "2.17"
+
+dependencies: []
