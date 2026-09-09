@@ -1,0 +1,34 @@
+{#
+  Template d'exemple du gabarit. À REMPLACER par la configuration du vrai rôle.
+
+  Deux règles à conserver, quel que soit le rôle :
+
+  1. AUCUN SECRET ici. Un template rend un fichier de configuration ; les trois
+     secrets du dispositif (clé d'enrôlement, jeton d'API, webhook Discord)
+     vivent dans le `.env` de la machine, lu par le programme à l'exécution.
+     Un secret rendu par un template finit dans la sortie d'un `--diff`.
+
+  2. L'en-tête « fichier géré » ci-dessous se garde. Sans lui, quelqu'un édite
+     le fichier à la main, le rôle l'écrase au passage suivant, et la
+     modification disparaît sans trace.
+#}
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle « gabarit »).
+# Toute modification faite ici sera écrasée au prochain passage du rôle.
+# Modifier plutôt : infra/ansible/roles/gabarit/templates/gabarit.conf.j2
+#
+# Hôte    : {{ inventory_hostname }}
+# Rôle du nœud : {{ sentinel_node_role | default('inconnu') }}
+
+# Chemins du dispositif, tels que l'inventaire les définit.
+etat_dir  = {{ sentinel_state_dir }}
+journal_dir = {{ sentinel_log_dir }}
+
+# Ce qui appartient à 40KT1_HQ et qui se LIT seulement.
+# Le chemin diffère d'un nœud à l'autre : il vient de l'inventaire.
+hq_stack_dir = {{ hq_stack_dir }}
+
+# Témoin de désarmement d'urgence, lu AVANT tout geste.
+temoin_desarmement = {{ sentinel_disarm_file }}
+
+# État armé du rôle au moment du rendu. `false` est la valeur du dépôt.
+arme = {{ gabarit_enabled | bool | string | lower }}

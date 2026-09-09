@@ -1,0 +1,21 @@
+---
+# Constantes du rôle `gabarit` — NON surchargeables par l'inventaire.
+# `vars/` l'emporte sur `group_vars` : ce qui est ici est un invariant du rôle,
+# pas un réglage. Si une valeur doit pouvoir changer par machine, elle va dans
+# `defaults/main.yml`.
+
+# Préfixe obligatoire de toute unité systemd gérée par ce dépôt.
+# C'est la frontière avec HQ, rendue vérifiable : le handler de redémarrage
+# affirme ce préfixe avant d'agir (docs/contrat-hq.md).
+gabarit_prefixe_unites: "sentinel-"
+
+# Unités et services qui appartiennent à 40KT1_HQ. Ce rôle ne les redémarre
+# jamais, ne les reconfigure jamais, ne les arrête jamais. Il peut les LIRE.
+# La liste sert au message d'erreur du handler : elle nomme le piège.
+gabarit_unites_de_hq:
+  - "40kt1-*"
+  - "docker"
+  - "containerd"
+  - "tailscaled"
+  - "ssh"
+  - "ufw"

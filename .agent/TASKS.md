@@ -38,12 +38,22 @@ partie, toujours.**
 > `ADR-002` et `ADR-003` sont *Acceptées*. `P00.5` est à moitié faite : le jumeau
 > du contrat reste à porter dans `40KT1_HQ`.
 >
-> **Ensuite, en parallèle** : `P00.7`, `P00.8`, `P00.2`, `P01.7` (`cursor`) ·
-> `P01.6` puis `P01.0` (`claude`).
+> **2026-09-09 — revue de `claude`.** Les quatre lots rendus par `cursor`
+> (`P00.7`, `P00.8`, `P00.2`, `P01.7`) sont **acceptés**. Deux corrections de
+> revue ont été portées, aucune fonctionnelle : le statut réel d'`ADR-001` (cinq
+> phrases du dépôt affirmaient encore *Proposé*) et la porte des `indeterminee`
+> au critère de sortie de la phase 1. Deux suites sont **ouvertes**, décrites
+> plus bas en « Suites de revue ».
 >
-> **Plus bloqué** : les rôles Ansible le sont — `ADR-003` est *Acceptée*. Ce qui
-> bloque encore, c'est `P00.6` : sans amorce sur `main`, aucune branche n'a de
-> base.
+> **La suite, en parallèle** :
+> - `cursor` → **`P01.2`** (règles d'intégrité). Elle ne dépend **que** de
+>   `P00.2`, qui est faite : elle part **maintenant**, sans attendre le gabarit
+>   ni le rôle serveur — `rules/` et `infra/ansible/` sont deux zones
+>   distinctes ([`P02`](../docs/plans/P02-lancement-implementation.md) § 6).
+> - `claude` → `P01.6` (en cours), puis `P01.0`.
+>
+> **Plus bloqué** : plus rien côté décisions — les trois ADR sont *Acceptées* et
+> l'amorce est sur `main`.
 
 - [x] **P00.0** Amorce du dépôt : harnais `.agent/`, couche Cursor, hub docs,
       trois ADR au statut *Proposé*, plan `P01`, contrat de frontière avec HQ,
@@ -74,12 +84,39 @@ partie, toujours.**
       geste par geste (4 armés / 4 alerte / 1 jamais), « invisible pour l'équipe »
       défini, budget en **trois états** avec dégel humain, et les **cinq portes
       de l'armement** (§ 6) qui cadrent `P03.4`. Débloque `P03.0`.
-- [~] **P00.5** (claude, 2026-09-07) Contrat de frontière : côté Sentinelle
+- [~] **P00.5** (claude, 2026-09-07) — **en attente d'un dépôt tiers, pas en
+      cours ici** : le texte est prêt, la suite est une PR dans `40KT1_HQ`. Ce
+      `[~]` ne consomme donc pas le « une tâche à la fois » de `claude`.
+      Contrat de frontière : côté Sentinelle
       **fait** (relève et chaîne de blocage ajoutées à la liste d'objets, trois
       engagements de HQ explicités) ; le **jumeau reste à porter** dans
       `40KT1_HQ` — texte prêt dans
       [`docs/contrat-hq-jumeau.md`](../docs/contrat-hq-jumeau.md). **Ce lot ne se
       coche qu'à la fusion de la PR dans HQ**, pas à son ouverture.
+
+## Suites de revue — ouvertes le 2026-09-09
+
+> Deux constats de la revue des lots de `cursor`. Aucun n'est un défaut de
+> livraison : les deux lots sont conformes à leur brief. Ce sont des **trous
+> dans les briefs**, et ils se referment ici plutôt que dans une discussion.
+
+- [ ] **P00.11** (cursor) Garde `garde-armement` : élargir aux formes booléennes
+      **équivalentes**. Le motif actuel ne reconnaît que `true` / `false`
+      littéraux. Mesuré le 2026-09-09 sur `5ce90c0` : les quatre lignes
+      `sentinel_response_enabled: yes`, `sentinel_agent_enabled: True`,
+      `sentinel_bloc_enabled: on` et `sentinel_response_dry_run: no` ajoutées
+      dans `infra/ansible/` passent la garde en **vert**. Or `yes` est l'idiome
+      Ansible le plus courant : c'est exactement le mode de panne que le brief
+      `P00.8` nommait (« un rôle qui pose `..._enabled: true` dans ses
+      `defaults` »), et il passe. Étendre le motif à
+      `true|yes|on|True|Yes|On` (et `false|no|off|…` pour `dry_run`), guillemets
+      optionnels, puis **rejouer les quatre cas d'acceptation du brief `P00.8`**.
+      *Le gabarit `P01.6` impose déjà `false` littéral côté rôle ; cette garde
+      est la ceinture, pas les bretelles.*
+- [ ] **P00.12** (PO) Rendre `garde-armement` **obligatoire** dans le ruleset
+      `main-protection`, aux côtés des trois workflows de `P00.6`. Un contrôle
+      qui échoue mais ne bloque pas la fusion est un avis, pas une garde — et
+      `RULES` § 1 ne demande pas un avis. **Geste d'exploitation : PO.**
 
 ## Phase 1 — Observation seule
 
@@ -91,10 +128,18 @@ partie, toujours.**
       protocole et journal des faux positifs, avec le troisième état
       `indeterminee` — [brief](briefs/P01.7-instrumentation-observation.md).
       *Non bloqué par `ADR-003` : aucun fichier de machine.*
-- [ ] **P01.6** (claude) **Gabarit de rôle Ansible** : disposition, garde
-      `*_enabled`, politique « aucun redémarrage d'un service de HQ », bilan de
-      fin de rôle avec le nombre d'hôtes touchés, playbook `00_check.yml`,
-      groupe `sentinel_server` rempli dans l'inventaire.
+- [~] **P01.6** (claude, 2026-09-09) **Gabarit de rôle Ansible** :
+      [`roles/GABARIT.md`](../infra/ansible/roles/GABARIT.md) (le contrat) +
+      [`roles/gabarit/`](../infra/ansible/roles/gabarit/) (le squelette à
+      copier) ; garde `*_enabled` **de type** (une chaîne `"false"` est vraie en
+      Jinja) ; politique « aucun redémarrage d'un service de HQ » rendue
+      mécanique par affirmation du préfixe `sentinel-` dans le handler ; bilan
+      de rôle **et** bilan de play ; **garde de cible** contre le play qui vise
+      zéro hôte ; [`playbooks/00_check.yml`](../infra/ansible/playbooks/00_check.yml)
+      en lecture seule ; groupe `sentinel_server` rempli (`patator-standby`,
+      `ADR-003`). `yamllint` vert au réglage de la CI ; **`ansible-lint` non
+      joué en local** (non installable sur le poste Windows) — il tranche en CI.
+      Ne se coche qu'au vert de la CI sur la PR.
 - [ ] **P01.0** (claude) Rôle `sentinel_server` — serveur central sur l'hôte
       tranché en `C1`, **profil frugal** (pas d'indexeur, pas de console).
       Écoute sur `tailscale0` uniquement.

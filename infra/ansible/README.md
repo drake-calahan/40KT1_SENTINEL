@@ -1,8 +1,17 @@
 # Ansible — Sentinelle
 
-> ⚠️ **Aucun playbook n'existe encore.** Les cibles de cet inventaire sont les
-> **deux machines de production** du parc. Lire
+> ⚠️ **Un seul playbook existe : [`playbooks/00_check.yml`](playbooks/00_check.yml),
+> qui ne change rien.** Aucun rôle de production n'est écrit. Les cibles de cet
+> inventaire sont les **deux machines de production** du parc. Lire
 > [`.agent/RULES.md`](../../.agent/RULES.md) § 2 avant toute commande.
+
+## Avant d'écrire un rôle
+
+**Lire [`roles/GABARIT.md`](roles/GABARIT.md)**, et copier
+[`roles/gabarit/`](roles/gabarit/). Le gabarit fixe la disposition, la garde
+`*_enabled`, la politique « aucun redémarrage d'un service de HQ », le bilan de
+fin de rôle et la garde de cible. Il passe **avant** le premier rôle : sinon le
+deuxième recopie les choix implicites du premier, et personne ne les revoit.
 
 ## La règle, avant tout le reste
 
@@ -20,18 +29,31 @@ infra/ansible/
 ├── ansible.cfg
 ├── requirements.yml          collections, source unique (CI + poste d'admin)
 ├── inventory/
-│   ├── production.yml        les deux nœuds + l'hôte central (à trancher, C1)
+│   ├── production.yml        les deux nœuds + l'hôte central (tranché, ADR-003)
 │   └── group_vars/
 │       └── all/main.yml      variables partagées, aucun secret
 ├── playbooks/
+│   ├── 00_check.yml          préconditions, LECTURE SEULE          (P01.6) ✔
 │   ├── 01_server.yml         serveur central, profil frugal        (P01.0)
 │   ├── 02_agent.yml          agents sur les nœuds Linux            (P01.1)
 │   └── 03_responder.yml      exécuteur local + unités systemd      (P03.0)
 └── roles/
+    ├── GABARIT.md            le contrat de tout rôle                (P01.6) ✔
+    ├── gabarit/              le squelette à copier                  (P01.6) ✔
     ├── sentinel_server/
     ├── sentinel_agent/
     └── sentinel_responder/
 ```
+
+## Le seul playbook jouable aujourd'hui
+
+```bash
+cd infra/ansible && ansible-playbook playbooks/00_check.yml --check --diff
+```
+
+Il **lit** et ne pose rien : c'est le seul du dépôt dont ce soit vrai, et c'est
+pourquoi il porte le numéro `00`. Il refuse de conclure si aucun hôte n'a été
+atteint — un contrôle qui n'a regardé personne ne rend jamais vert.
 
 ## Ce que tout rôle de ce dépôt doit respecter
 

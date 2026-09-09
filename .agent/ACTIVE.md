@@ -14,10 +14,16 @@
 8 blocs) a reçu les réponses du PO le **2026-09-07**. Les quatre STRUCTURANTES
 sont tranchées et consignées ci-dessous § « Réponses au cadrage ».
 
-**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus) : `P00.6` — tant que
-l'amorce n'est pas sur `main`, aucune branche n'a de base, et rien ne fusionne.
-Ensuite : `P00.7`, `P00.8`, `P00.2`, `P01.7` (`cursor`) · `P01.6` puis `P01.0`
-(`claude`) · **porter le jumeau du contrat dans HQ** (`P00.5`, dernière moitié).
+**Suite immédiate** (voir [`TASKS.md`](TASKS.md) Focus), au **2026-09-09** :
+l'amorce est sur `main`, les quatre lots de `cursor` de la vague 0/1 sont rendus
+et **acceptés en revue**. Ce qui part maintenant, en parallèle :
+`P01.2` (`cursor` — elle ne dépend que de `P00.2`, faite : elle n'attend ni le
+gabarit ni le rôle serveur) · `P01.6` puis `P01.0` (`claude`) · **porter le
+jumeau du contrat dans HQ** (`P00.5`, dernière moitié — dépôt tiers).
+
+Deux suites de revue sont ouvertes dans `TASKS.md` : `P00.11` (la garde
+`garde-armement` ne voit pas `yes` / `on`, mesuré) et `P00.12` (rendre cette
+garde obligatoire à la fusion).
 
 **Le lancement est cadré** : découpage en lots, affectation et ordre des vagues
 dans [`docs/plans/P02`](../docs/plans/P02-lancement-implementation.md) ; briefs

@@ -1,0 +1,16 @@
+---
+# Métadonnées du rôle `gabarit`.
+#
+# `dependencies` reste vide, et c'est un choix : un rôle qui en tire un autre
+# implicitement rend impossible de savoir ce qu'un `--check` va parcourir. Les
+# dépendances d'un rôle de ce dépôt s'écrivent dans le playbook, où on les voit.
+
+galaxy_info:
+  author: 40KT1 — Sentinelle
+  description: >-
+    Gabarit de rôle. Ne s'exécute pas en production : il se copie.
+    Contrat complet dans infra/ansible/roles/GABARIT.md.
+  license: proprietary
+  min_ansible_version: "2.17"
+
+dependencies: []

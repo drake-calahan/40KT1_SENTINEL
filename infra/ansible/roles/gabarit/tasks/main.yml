@@ -1,0 +1,37 @@
+---
+# Orchestration du rôle `gabarit`, et RIEN d'autre.
+#
+# Aucune tâche métier ici : un `main.yml` qui fait le travail atteint trois
+# cents lignes et devient illisible à 3 h du matin, qui est exactement l'heure
+# où on le lira. L'ordre des quatre étapes est le contrat du gabarit — il ne se
+# réarrange pas rôle par rôle.
+
+- name: Préconditions — ce qui doit être vrai avant de poser quoi que ce soit
+  ansible.builtin.include_tasks: 00_garde.yml
+  tags:
+    - gabarit
+    - gabarit_garde
+    - always  # une garde qu'on peut sauter par `--tags` n'est pas une garde
+
+- name: Pose — fichiers et unité, sans rien démarrer
+  ansible.builtin.include_tasks: 10_pose.yml
+  tags:
+    - gabarit
+    - gabarit_pose
+
+# Tout ce qui arme vit dans ce fichier, et nulle part ailleurs. Le `when` est
+# ici, une fois, plutôt que dispersé sur quinze tâches : un armement dispersé
+# ne se relit pas.
+- name: Armement — uniquement sur geste explicite d'un humain
+  ansible.builtin.include_tasks: 20_armement.yml
+  when: gabarit_enabled | bool
+  tags:
+    - gabarit
+    - gabarit_armement
+
+- name: Bilan — y compris ce qui a été signalé sans être joué
+  ansible.builtin.include_tasks: 90_bilan.yml
+  tags:
+    - gabarit
+    - gabarit_bilan
+    - always  # un bilan qu'on peut sauter laisse croire que tout s'est bien passé

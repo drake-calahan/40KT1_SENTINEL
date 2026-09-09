@@ -1,0 +1,47 @@
+---
+# Handlers du rôle `gabarit`.
+#
+# ══ LA RÈGLE QUE CE FICHIER REND MÉCANIQUE ═════════════════════════════════
+# Un rôle de ce dépôt ne redémarre QUE des unités « sentinel-* ».
+#
+# `patator-tower` sert `hq.40kt1.com`. Un `restart` de `docker` ou de `caddy`
+# glissé dans un handler coupe le site public pendant l'installation d'un outil
+# de sécurité — et personne ne fait le lien. HQ possède la base, Sentinelle
+# ajoute (docs/contrat-hq.md).
+#
+# D'où la forme ci-dessous : les deux handlers écoutent le MÊME sujet, et
+# l'affirmation est déclarée en premier. Les handlers d'un même `listen`
+# s'exécutent dans l'ordre de déclaration : le refus tombe donc AVANT le
+# redémarrage, pas après.
+#
+# Aucune tâche du rôle n'appelle `systemd_service: state: restarted` en direct.
+# Écrire une telle tâche, c'est contourner cette garde — la revue la refuse.
+# ═══════════════════════════════════════════════════════════════════════════
+
+- name: Refuser de redémarrer une unité qui n'appartient pas à Sentinelle
+  ansible.builtin.assert:
+    that:
+      - item is string
+      - item.startswith(gabarit_prefixe_unites)
+    fail_msg: >-
+      REFUS : « {{ item }} » ne commence pas par « {{ gabarit_prefixe_unites }} ».
+      Ce dépôt ne redémarre que ses propres unités. Les unités de 40KT1_HQ
+      ({{ gabarit_unites_de_hq | join(', ') }}) se LISENT, jamais ne se
+      redémarrent — un redémarrage de la stack de production pendant la pose
+      d'un outil de sécurité coupe hq.40kt1.com. Si le changement exige
+      réellement ce redémarrage, il se SIGNALE dans le bilan du rôle et un
+      humain le joue. Voir .agent/RULES.md § 3 et docs/contrat-hq.md.
+    quiet: true
+  loop: "{{ gabarit_unites_a_redemarrer }}"
+  listen: redemarrer les unites sentinelle
+
+- name: Redémarrer les unités Sentinelle
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: restarted
+    daemon_reload: true
+  loop: "{{ gabarit_unites_a_redemarrer }}"
+  # Désarmé, l'unité est posée mais pas démarrée : la redémarrer la
+  # démarrerait, et ce serait un armement par effet de bord.
+  when: gabarit_enabled | bool
+  listen: redemarrer les unites sentinelle

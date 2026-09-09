@@ -143,6 +143,51 @@ constaté que « ça ne marche pas ».
 écrit une entrée `degel` dans le journal ; c'est cette entrée qui remet le
 compteur à zéro. Le motif est obligatoire.
 
+## Ansible — quatre faux verts, mesurés en écrivant le gabarit (`P01.6`)
+
+### `-e var=false` arme au lieu de désarmer
+
+*2026-09-09.* La forme `ansible-playbook … -e sentinel_agent_enabled=false` passe
+la **chaîne** `"false"`, et une chaîne non vide est **vraie** en Jinja. La
+commande tapée pour désarmer arme. Le runbook d'armement s'écrira sur ce piège.
+
+**Implication** : tout rôle affirme `... is boolean` en préconditions
+(`roles/gabarit/tasks/00_garde.yml`), et la forme correcte est JSON :
+`-e '{"sentinel_agent_enabled": true}'`.
+
+### Avec `failed_when: false`, `.failed` ne dit plus rien
+
+*2026-09-09.* Motif tentant pour lire un témoin sans planter :
+`stat` + `failed_when: false`, puis tester `resultat.failed`. Il vaut **toujours
+faux**, y compris quand le module n'a rien pu lire et n'a donc rien renvoyé. On
+conclut alors « fichier absent » sur une mesure qui n'a pas eu lieu — le faux
+vert, écrit à la main.
+
+**Implication** : le test porte sur la **présence de la clé** `stat`
+(`'stat' not in resultat` → `inconnu`), jamais sur `.failed`. Vérifié sur les
+trois cas (témoin présent / absent / module muet).
+
+### `ignore_unreachable: true` rend `0` sur zéro machine
+
+*2026-09-09.* Nécessaire ici — `patator-standby` perd son IPv4 — mais si **tous**
+les nœuds sont injoignables, le playbook se termine avec le code `0`. Il n'a rien
+contrôlé et le dit vert.
+
+**Implication** : `00_check.yml` se termine par un play `localhost` qui **refuse
+de conclure** si l'ensemble atteint est vide, et nomme les nœuds restés
+`INCONNU`. Un play qui vise un groupe **vide**, lui, n'exécute aucune tâche : le
+seul endroit qui peut le voir est la **garde de cible**, en amont.
+
+### La garde CI d'armement ne voit pas `yes`
+
+*2026-09-09.* Mesuré sur `5ce90c0` : `sentinel_response_enabled: yes`,
+`... : True`, `... : on` et `sentinel_response_dry_run: no` ajoutés dans
+`infra/ansible/` passent `garde-armement.sh` en **vert**. Le motif ne connaît que
+`true` / `false` littéraux, alors que `yes` est l'idiome Ansible courant.
+
+**Implication** : lot `P00.11`. En attendant, le gabarit impose `false` littéral
+dans `defaults/` — et la garde CI reste la ceinture, pas les bretelles.
+
 ## Contraintes de ressources
 
 - Serveur central en profil frugal : **0,7 à 1,2 Go** de RAM. Le profil complet

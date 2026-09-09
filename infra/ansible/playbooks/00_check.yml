@@ -1,0 +1,246 @@
+---
+# 00_check.yml — Le playbook qui ne change rien.
+#
+# Il répond à une seule question, avant tous les autres playbooks :
+# « les machines sont-elles dans l'état que les rôles présument ? »
+#
+# ── CE QU'IL FAIT ──────────────────────────────────────────────────────────
+# Il LIT. Aucune tâche ne pose, ne modifie, ne démarre, ne redémarre quoi que
+# ce soit. Il est sûr à jouer sur les deux machines de production, à n'importe
+# quelle heure, sans ordre PO — c'est le seul playbook du dépôt dont ce soit
+# vrai, et c'est pour cette raison qu'il porte le numéro 00.
+#
+# ── COMMENT ON LE JOUE ─────────────────────────────────────────────────────
+#   cd infra/ansible
+#   ansible-playbook playbooks/00_check.yml --check --diff
+#
+# `--check` reste dans la commande même si le playbook ne change rien : c'est
+# l'habitude qui protège, pas l'exception qu'on s'autorise (.agent/RULES.md § 2).
+#
+# ── LE MODE DE PANNE QU'IL EXISTE POUR ATTRAPER ────────────────────────────
+# Dans 40KT1_HQ, cinq playbooks visaient un hôte en dur. Déplacer cet hôte les
+# aurait rendus muets — SUR ZÉRO HÔTE, EN RENDANT `ok`. Un play qui ne vise
+# personne n'exécute aucune tâche : aucun bilan ne s'affiche, et le code de
+# retour est 0. Le seul endroit d'où on peut le voir est un play EN AMONT, qui
+# regarde l'inventaire plutôt que les machines. C'est le play n° 1 ci-dessous,
+# et c'est le modèle que tout playbook du dépôt recopie en tête
+# (roles/GABARIT.md § 4.3).
+
+# ══════════════════════════════════════════════════════════════════════════
+# PLAY 1 — Garde de cible : refuser un plan qui ne viserait personne.
+# ══════════════════════════════════════════════════════════════════════════
+- name: Garde de cible — les groupes visés portent-ils des hôtes ?
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tags:
+    - always
+
+  vars:
+    # Les groupes dont l'existence conditionne la phase 1. Les postes
+    # d'administration (`sentinel_agents_workstations`) ne sont PAS ici : ils
+    # sont vides par décision (`E6`, phase 4), et un groupe vide par décision
+    # n'est pas le même objet qu'un groupe vide par accident.
+    groupes_obligatoires:
+      - sentinel_agents_linux
+      - sentinel_server
+
+  tasks:
+    - name: Chaque groupe obligatoire porte au moins un hôte
+      ansible.builtin.assert:
+        that:
+          - groups[item] is defined
+          - groups[item] | length > 0
+        fail_msg: >-
+          Le groupe « {{ item }} » est vide ou absent de l'inventaire. Un play
+          qui le viserait ne toucherait AUCUN hôte et rendrait « ok » : c'est le
+          pire mode de panne du parc, déjà payé cinq fois dans 40KT1_HQ.
+          Corriger inventory/production.yml avant d'aller plus loin.
+        success_msg: "{{ item }} : {{ groups[item] | default([]) | length }} hôte(s)"
+        quiet: false
+      loop: "{{ groupes_obligatoires }}"
+
+    - name: Recensement des cibles, avant tout contact
+      ansible.builtin.debug:
+        msg:
+          - "agents Linux    : {{ groups['sentinel_agents_linux'] | join(', ') }}"
+          - "serveur central : {{ groups['sentinel_server'] | join(', ') }}"
+          - "postes (P04.0)  : {{ groups['sentinel_agents_workstations'] | default([]) | join(', ') | default('aucun — normal en phase 1', true) }}"
+
+# ══════════════════════════════════════════════════════════════════════════
+# PLAY 2 — Préconditions sur les machines. Lecture seule, trois états.
+# ══════════════════════════════════════════════════════════════════════════
+- name: Préconditions des nœuds Sentinelle
+  hosts: sentinel_agents_linux:sentinel_server
+  gather_facts: true
+  become: false
+  # Un nœud injoignable ne doit pas arrêter le contrôle des autres : on veut
+  # savoir QUI est joignable, ce qui est précisément l'information cherchée.
+  # `patator-standby` perd son IPv4 par intermittence (quatre occurrences).
+  ignore_unreachable: true
+  tags:
+    - preconditions
+
+  tasks:
+    # ── L'élévation de privilège ──────────────────────────────────────────
+    # `sudo-rs` est le `sudo` par défaut d'Ubuntu 26.04 et casse l'élévation
+    # Ansible : « Timeout waiting for privilege escalation prompt », un message
+    # qui ressemble à un problème de réseau ou de mot de passe et n'est ni l'un
+    # ni l'autre. Le contournement (`ansible_become_exe: /usr/bin/sudo.ws`) est
+    # dans l'inventaire ; cette tâche vérifie qu'il fonctionne encore.
+    - name: L'élévation de privilège fonctionne sur ce nœud
+      ansible.builtin.command: /usr/bin/id -u
+      become: true
+      register: verif_become
+      changed_when: false
+      failed_when: false
+
+    - name: État de l'élévation — ok / ko
+      ansible.builtin.assert:
+        that:
+          - verif_become.rc == 0
+          - verif_become.stdout | trim == '0'
+        fail_msg: >-
+          L'élévation échoue sur {{ inventory_hostname }}
+          (rc={{ verif_become.rc | default('?') }}). Si le message parle d'un
+          « timeout waiting for privilege escalation prompt », ce n'est ni le
+          réseau ni le mot de passe : c'est `sudo-rs`. Poser
+          `ansible_become_exe: /usr/bin/sudo.ws` sur cet hôte
+          (.agent/DISCOVERY.md).
+        success_msg: "élévation : ok"
+        quiet: true
+
+    # ── Le chemin de la stack HQ ──────────────────────────────────────────
+    # /srv/40kt1 sur la tour, /home/calahan/40KT1_HQ sur le standby. Un rôle
+    # qui présume le chemin marche sur un nœud et ment sur l'autre.
+    - name: Lire le répertoire de la stack HQ déclaré pour ce nœud
+      ansible.builtin.stat:
+        path: "{{ hq_stack_dir }}"
+      register: verif_stack
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: État du répertoire de la stack HQ — ok / ko / inconnu
+      ansible.builtin.debug:
+        msg: >-
+          stack HQ ({{ hq_stack_dir }}) :
+          {{
+            'INCONNU — non lisible, aucune conclusion'
+            if 'stat' not in verif_stack
+            else ('ok' if verif_stack.stat.exists
+                  else 'KO — déclaré dans l\'inventaire mais absent de la machine')
+          }}
+
+    # ── Le témoin de mode tournoi ─────────────────────────────────────────
+    # Posé et retiré par HQ. Sentinelle le LIT. Deux automates qui se posent le
+    # même verrou est un mode de panne connu.
+    - name: Lire le témoin de mode tournoi
+      ansible.builtin.stat:
+        path: "{{ hq_tournament_mode_file }}"
+      register: verif_tournoi
+      changed_when: false
+      failed_when: false
+      become: true
+
+    # ── Le pousseur d'alerte de HQ, réutilisé tel quel ────────────────────
+    - name: Lire le script d'alerte de HQ
+      ansible.builtin.stat:
+        path: "{{ hq_notify_script }}"
+      register: verif_notify
+      changed_when: false
+      failed_when: false
+      become: true
+
+    # ── Ce que Sentinelle a déjà posé — et il ne doit RIEN y avoir ────────
+    # En phase 0, la seule réponse correcte est « absent » sur les deux nœuds.
+    # Si ce répertoire existe, quelque chose a été posé hors du dépôt.
+    - name: Lire le répertoire d'installation de Sentinelle
+      ansible.builtin.stat:
+        path: "{{ sentinel_install_dir }}"
+      register: verif_install
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Lire le témoin de désarmement d'urgence
+      ansible.builtin.stat:
+        path: "{{ sentinel_disarm_file }}"
+      register: verif_desarmement
+      changed_when: false
+      failed_when: false
+      become: true
+
+    # ── Bilan de nœud ─────────────────────────────────────────────────────
+    # Chaque ligne rend `ok`, `KO` ou `INCONNU`. Jamais deux états seulement :
+    # une mesure qu'on n'a pas pu prendre ne rend pas « ok » (.agent/RULES.md § 1).
+    - name: Bilan du nœud
+      ansible.builtin.debug:
+        msg:
+          - "hôte              : {{ inventory_hostname }} ({{ sentinel_node_role | default('rôle non déclaré') }})"
+          - "système           : {{ ansible_facts['distribution'] | default('inconnu') }} {{ ansible_facts['distribution_version'] | default('') }}"
+          - "élévation         : {{ 'ok' if verif_become.rc | default(1) == 0 else 'KO' }}"
+          - "stack HQ          : {{ 'INCONNU' if 'stat' not in verif_stack else ('ok' if verif_stack.stat.exists else 'KO — absente') }}"
+          - "mode tournoi (HQ) : {{ 'INCONNU — non lisible' if 'stat' not in verif_tournoi else ('ACTIF' if verif_tournoi.stat.exists else 'inactif') }}"
+          - "notify.sh de HQ   : {{ 'INCONNU' if 'stat' not in verif_notify else ('ok' if verif_notify.stat.exists else 'KO — absent, P02.0 en dépend') }}"
+          - "install Sentinelle: {{ 'INCONNU' if 'stat' not in verif_install else ('PRÉSENT — anormal en phase 0/1' if verif_install.stat.exists else 'absent (attendu)') }}"
+          - "témoin désarmement: {{ 'INCONNU' if 'stat' not in verif_desarmement else ('POSÉ' if verif_desarmement.stat.exists else 'absent') }}"
+
+# ══════════════════════════════════════════════════════════════════════════
+# PLAY 3 — Bilan de play : combien d'hôtes ont RÉELLEMENT été touchés.
+# ══════════════════════════════════════════════════════════════════════════
+# C'est le seul contrôle qui distingue « tout va bien » de « je n'ai regardé
+# personne ». Il tourne sur localhost pour rester lisible même si tous les
+# nœuds sont injoignables — un bilan porté par les cibles disparaît avec elles.
+- name: Bilan de play — hôtes visés contre hôtes atteints
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tags:
+    - always
+
+  vars:
+    vises: "{{ (groups['sentinel_agents_linux'] + groups['sentinel_server']) | unique | sort }}"
+    # `ansible_play_hosts` du play précédent n'est pas lisible depuis ici. On
+    # reconstruit donc l'ensemble atteint à partir des FAITS : un hôte que le
+    # play 2 n'a pas pu joindre n'a pas de faits collectés.
+    #
+    # Le sens de l'erreur compte : un hôte joint dont les faits seraient
+    # incomplets serait compté « non atteint », donc INCONNU. C'est le bon
+    # côté — l'inverse fabriquerait un « ok » sur une machine non mesurée.
+    atteints: >-
+      {{ vises | map('extract', hostvars)
+               | selectattr('ansible_facts.distribution', 'defined')
+               | map(attribute='inventory_hostname') | list }}
+
+  tasks:
+    - name: Compte des hôtes visés et atteints
+      ansible.builtin.debug:
+        msg:
+          - "visés   ({{ vises | length }}) : {{ vises | join(', ') }}"
+          - "atteints ({{ atteints | length }}) : {{ atteints | join(', ') | default('AUCUN', true) }}"
+          - "manquants : {{ (vises | difference(atteints)) | join(', ') | default('aucun', true) }}"
+
+    # Zéro hôte atteint est un échec, pas un succès silencieux. C'est la
+    # traduction directe de « un ok n'est pas un inconnu ».
+    - name: Refuser de conclure si aucun hôte n'a été atteint
+      ansible.builtin.assert:
+        that:
+          - atteints | length > 0
+        fail_msg: >-
+          AUCUN hôte n'a été atteint. Ce playbook n'a donc RIEN vérifié, et son
+          silence ne vaut pas « tout va bien ». Vérifier le tailnet, puis
+          l'IPv4 de patator-standby — ce nœud l'a perdue quatre fois en trois
+          semaines (.agent/DISCOVERY.md).
+        success_msg: "{{ atteints | length }} hôte(s) réellement contrôlé(s)"
+        quiet: true
+
+    # Un nœud manquant n'invalide pas le contrôle des autres, mais il ne se
+    # tait pas non plus : il reste INCONNU, et le dire est le point.
+    - name: Signaler les hôtes restés inconnus
+      ansible.builtin.debug:
+        msg: >-
+          INCONNU — {{ (vises | difference(atteints)) | join(', ') }} n'a pas
+          été joint. Son état n'est pas « conforme », il est NON MESURÉ. Ne
+          conclure vert sur aucun lot qui dépend de ce nœud.
+      when: (vises | difference(atteints)) | length > 0

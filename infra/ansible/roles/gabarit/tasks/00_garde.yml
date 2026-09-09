@@ -1,0 +1,92 @@
+---
+# Préconditions du rôle `gabarit`.
+#
+# Ce fichier ne pose rien. Il refuse de continuer sur un terrain qu'il n'a pas
+# compris — ce qui est l'inverse exact du faux vert que ce dépôt combat.
+
+# ── 1. La garde d'armement est-elle un VRAI booléen ? ──────────────────────
+# Le mode de panne visé est précis : `-e gabarit_enabled=false` passe la CHAÎNE
+# "false" en ligne de commande. En Jinja, une chaîne non vide est vraie. Sans
+# cette affirmation, la commande qui croyait désarmer arme.
+- name: La garde d'armement est un booléen, pas une chaîne
+  ansible.builtin.assert:
+    that:
+      - gabarit_enabled is defined
+      - gabarit_enabled is boolean
+    fail_msg: >-
+      « gabarit_enabled » vaut {{ gabarit_enabled | default('(non défini)') | string }}
+      ({{ gabarit_enabled | default(None) | type_debug }}), ce n'est pas un
+      booléen. Une chaîne non vide est VRAIE en Jinja : « -e gabarit_enabled=false »
+      armerait le rôle en croyant le désarmer. Utiliser la forme JSON :
+      -e '{"gabarit_enabled": true}'. Voir .agent/RULES.md § 1.
+    quiet: true
+
+# ── 2. L'unité gérée porte bien le préfixe du dépôt ────────────────────────
+# La frontière avec HQ ne tient pas si un rôle se met à gérer « 40kt1-api ».
+- name: L'unité gérée appartient bien à Sentinelle
+  ansible.builtin.assert:
+    that:
+      - gabarit_unite.startswith(gabarit_prefixe_unites)
+    fail_msg: >-
+      « {{ gabarit_unite }} » ne commence pas par « {{ gabarit_prefixe_unites }} ».
+      Sentinelle ajoute, elle ne reprend pas les unités de HQ
+      ({{ gabarit_unites_de_hq | join(', ') }}). Voir docs/contrat-hq.md.
+    quiet: true
+
+# ── 3. Le chemin de la stack HQ est fourni par l'inventaire, pas présumé ───
+# `/srv/40kt1` sur la tour, `/home/calahan/40KT1_HQ` sur le standby. Un rôle
+# qui présume le chemin marche sur un nœud et ment sur l'autre.
+- name: Le chemin de la stack HQ vient de l'inventaire
+  ansible.builtin.assert:
+    that:
+      - hq_stack_dir is defined
+      - hq_stack_dir | length > 0
+    fail_msg: >-
+      « hq_stack_dir » n'est pas défini pour {{ inventory_hostname }}. Ce chemin
+      diffère d'un nœud à l'autre (/srv/40kt1 sur la tour,
+      /home/calahan/40KT1_HQ sur le standby) : il se LIT dans l'inventaire, il
+      ne se devine pas.
+    quiet: true
+
+# ── 4. Le mode tournoi — trois états, jamais deux ──────────────────────────
+# `RULES` § 1 : un `ok` n'est pas un `inconnu`. Le témoin est posé et retiré par
+# HQ ; Sentinelle le LIT. S'il est illisible, on ne conclut pas « pas de
+# tournoi » : on rend « inconnu », et la décision revient à l'appelant.
+- name: Lire le témoin de mode tournoi (posé par HQ, jamais par nous)
+  ansible.builtin.stat:
+    path: "{{ hq_tournament_mode_file }}"
+  register: gabarit_temoin_tournoi
+  # Une lecture ne change rien, et un `stat` en échec ne doit pas arrêter le
+  # rôle : il doit produire « inconnu ». C'est tout l'objet de la tâche.
+  failed_when: false
+  changed_when: false
+
+- name: Établir l'état du mode tournoi — actif / inactif / inconnu
+  ansible.builtin.set_fact:
+    # Le test porte sur la PRÉSENCE de la clé `stat`, pas sur `.failed` :
+    # avec `failed_when: false`, `.failed` vaut toujours faux, y compris quand
+    # le module n'a rien pu lire et n'a donc rien renvoyé. Se fier à `.failed`
+    # ici, c'est fabriquer le faux vert qu'on prétend éviter.
+    gabarit_mode_tournoi: >-
+      {{
+        'inconnu' if ('stat' not in gabarit_temoin_tournoi)
+        else ('actif' if gabarit_temoin_tournoi.stat.exists else 'inactif')
+      }}
+
+- name: Signaler un mode tournoi indéterminé
+  ansible.builtin.debug:
+    msg: >-
+      INCONNU : le témoin de mode tournoi
+      « {{ hq_tournament_mode_file }} » n'a pas pu être lu. Ce n'est PAS
+      équivalent à « pas de tournoi ». Aucun geste ne se décide sur cette
+      base — voir .agent/RULES.md § 1.
+  when: gabarit_mode_tournoi == 'inconnu'
+
+# ── 5. Rien signalé pour l'instant ─────────────────────────────────────────
+# La liste que 10_pose.yml et 20_armement.yml alimentent quand ils REFUSENT de
+# jouer un changement (typiquement : il exigerait de redémarrer un service de
+# HQ). Le bilan la relit. Un rôle qui se tait sur ce qu'il a refusé de faire
+# ment par omission.
+- name: Ouvrir la liste des points signalés mais non joués
+  ansible.builtin.set_fact:
+    gabarit_points_signales: []
