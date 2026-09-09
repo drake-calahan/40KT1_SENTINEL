@@ -2,8 +2,8 @@
 
 > **État au 2026-09-07 : dépôt amorcé, cadrage répondu (30/30), rien n'est installé
 > ni armé.** Aucune machine du parc ne porte quoi que ce soit de ce dépôt.
-> **`ADR-002` et `ADR-003` sont *Acceptées*** (2026-09-07) : `P1` et l'écriture de
-> l'exécuteur sont débloquées. `ADR-001` reste *Proposé* (`P00.2`). Le contrat de
+> **Les trois ADR sont *Acceptées*** (2026-09-07) : `P1` et l'écriture de
+> l'exécuteur sont débloquées ; `ADR-001` a été acceptée en `P00.2`. Le contrat de
 > frontière est en vigueur **côté Sentinelle seulement** — son jumeau reste à
 > porter dans HQ (`P00.5`), et sans lui il n'engage personne.
 

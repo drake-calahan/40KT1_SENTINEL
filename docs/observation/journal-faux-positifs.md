@@ -37,10 +37,14 @@
 Semaine calendaire = lundi → dimanche. Remplir une ligne par semaine de la
 période `D5` (14 jours, couverture déploiement + sauvegarde offsite).
 
-| Semaine (lun–dim) | Alertes (total) | Dont non pertinentes | Dont indéterminées | Critère de sortie (`< 3` non pertinentes) |
-|-------------------|-----------------|----------------------|--------------------|-------------------------------------------|
+| Semaine (lun–dim) | Alertes (total) | Dont non pertinentes | Indéterminées restantes après repassage | Critère de sortie (`< 3` non pertinentes **et** 0 indéterminée restante) |
+|-------------------|-----------------|----------------------|------------------------------------------|--------------------------------------------------------------------------|
 | _aaaa-mm-jj → aaaa-mm-jj_ | | | | oui / non |
 | _aaaa-mm-jj → aaaa-mm-jj_ | | | | oui / non |
 
 **Sortie de phase 1** : deux semaines de suite avec « oui » **et** période
 couvrant au moins un déploiement complet et une sauvegarde offsite.
+
+Une `indeterminee` non reclassée au repassage hebdomadaire fait tomber la
+semaine à « non », même à zéro alerte non pertinente (protocole § 4). Un `ok`
+n'est pas un `inconnu`.

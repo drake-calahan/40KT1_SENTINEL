@@ -3,8 +3,8 @@
 > **Statut** : phase `P0` en cours. Rien n'est installé.
 > **ADR** : [`ADR-001`](../adr/ADR-001-moteur-et-profil-de-deploiement.md) ·
 > [`ADR-002`](../adr/ADR-002-catalogue-et-budget-de-reponse.md) ·
-> [`ADR-003`](../adr/ADR-003-hote-du-serveur-central.md) — **`002` et `003`
-> *Acceptées* le 2026-09-07 ; `001` encore *Proposé*.**
+> [`ADR-003`](../adr/ADR-003-hote-du-serveur-central.md) — **les trois
+> *Acceptées* le 2026-09-07.**
 > **Découpage et affectation** : [`P02`](P02-lancement-implementation.md)
 > **Suivi** : [`.agent/TASKS.md`](../../.agent/TASKS.md)
 

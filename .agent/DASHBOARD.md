@@ -5,9 +5,9 @@
 
 ## En une ligne
 
-**Phase 0 — cadrage consigné, formalisation aux deux tiers.** Trente réponses PO
-(2026-09-07), quatre STRUCTURANTES tranchées. `ADR-002` et `ADR-003` **Acceptées**
-le 2026-09-07 ; `ADR-001` reste *Proposé*. **Aucune machine du parc ne porte quoi
+**Phase 0 — cadrage consigné, formalisation faite.** Trente réponses PO
+(2026-09-07), quatre STRUCTURANTES tranchées. Les **trois ADR sont Acceptées**
+(2026-09-07). **Aucune machine du parc ne porte quoi
 que ce soit de ce dépôt, et rien n'est armé.**
 
 ## Avancement

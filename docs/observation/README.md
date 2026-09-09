@@ -62,6 +62,14 @@ mauvais.
   **une** alerte, pas pour le nombre d'occurrences sous-jacentes.
 - Seules les lignes au verdict `non pertinente` alimentent le seuil de sortie.
   Les `indeterminee` ont leur colonne et n'y entrent pas.
+- **Mais une `indeterminee` ne se referme pas toute seule.** Au repassage
+  hebdomadaire, chaque `indeterminee` de la semaine est **reclassée**
+  `pertinente` ou `non pertinente`. Celles qui restent `indeterminee` après le
+  repassage sont **reportées avec leur motif**, et **une semaine qui en porte
+  encore une ne compte pas « oui »** au critère de sortie, même à zéro alerte
+  non pertinente. *Sortir de la phase 1 sur un tas d'inconnues, c'est
+  exactement le faux vert que ce dépôt existe pour empêcher — `RULES` § 1 :
+  un `ok` n'est pas un `inconnu`.*
 
 ## 5. Critère de sortie
 
