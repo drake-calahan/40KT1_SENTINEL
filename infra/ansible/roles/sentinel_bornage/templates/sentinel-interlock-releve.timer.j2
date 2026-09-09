@@ -1,0 +1,22 @@
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle sentinel_bornage).
+# Source : infra/ansible/roles/sentinel_bornage/templates/sentinel-interlock-releve.timer.j2
+#
+# LIVRÉ DÉSARMÉ : posé, ni activé ni démarré. C'est ce timer qu'un humain
+# active en jouant le runbook — et c'est le geste qui arme la condition 2.
+
+[Unit]
+Description=Sentinelle — cadence de l'interlock de relève
+
+[Timer]
+# Cadence : {{ sentinel_bornage_interlock_cadence }}. La relève de HQ n'est pas
+# une bascule à la seconde ; interroger plus souvent ferait de ce timer une
+# charge sur la machine qu'il protège.
+OnBootSec={{ sentinel_bornage_interlock_cadence }}
+OnUnitActiveSec={{ sentinel_bornage_interlock_cadence }}
+AccuracySec=10s
+# Pas de `Persistent=true` : rattraper au démarrage les passages manqués n'a
+# aucun sens ici. Seul l'état ACTUEL de la relève compte.
+Unit={{ sentinel_bornage_interlock_unite }}
+
+[Install]
+WantedBy=timers.target

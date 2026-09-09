@@ -1,0 +1,31 @@
+---
+# Orchestration du rôle `sentinel_bornage`, et rien d'autre.
+
+- name: Préconditions
+  ansible.builtin.include_tasks: 00_garde.yml
+  tags:
+    - sentinel_bornage
+    - sentinel_bornage_garde
+    - always
+
+# Le plafond se pose ici, sans garde : c'est une contrainte, pas un geste.
+# L'interlock se pose ici aussi, mais désarmé.
+- name: Pose — plafond appliqué, interlock installé et arrêté
+  ansible.builtin.include_tasks: 10_pose.yml
+  tags:
+    - sentinel_bornage
+    - sentinel_bornage_pose
+
+- name: Armement de l'interlock — uniquement sur geste explicite d'un humain
+  ansible.builtin.include_tasks: 20_armement.yml
+  when: sentinel_bornage_interlock_enabled | bool
+  tags:
+    - sentinel_bornage
+    - sentinel_bornage_armement
+
+- name: Bilan
+  ansible.builtin.include_tasks: 90_bilan.yml
+  tags:
+    - sentinel_bornage
+    - sentinel_bornage_bilan
+    - always

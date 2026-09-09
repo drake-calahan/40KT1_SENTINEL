@@ -1,0 +1,66 @@
+---
+# Bilan du rôle `sentinel_bornage` — portée : l'hôte courant.
+
+# La condition 1 se VÉRIFIE, elle ne se déclare pas (ADR-003). On relit donc ce
+# que systemd applique RÉELLEMENT, pas ce que le template a écrit. Un drop-in
+# posé sans `daemon-reload` est un fichier, pas une limite — et la différence ne
+# se voit pas dans un `--diff`.
+- name: Relire les plafonds réellement appliqués par systemd
+  ansible.builtin.command:
+    cmd: >-
+      systemctl show {{ sentinel_bornage_unite }}
+      -p MemoryHigh -p MemoryMax -p CPUQuotaPerSecUSec
+  become: true
+  register: sentinel_bornage_mesure
+  changed_when: false
+  failed_when: false
+  # En `--check`, le drop-in n'a pas été posé : la mesure n'aurait aucun sens.
+  # On ne la simule pas, on l'annonce non prise.
+  when: not ansible_check_mode
+
+- name: Bilan du bornage sur cet hôte
+  ansible.builtin.debug:
+    msg:
+      - "hôte                : {{ inventory_hostname }}"
+      - "unité bornée        : {{ sentinel_bornage_unite }}"
+      - "plafond DEMANDÉ     : MemoryHigh={{ sentinel_bornage_memory_high }} MemoryMax={{ sentinel_bornage_memory_max }} CPUQuota={{ sentinel_bornage_cpu_quota }}"
+      - "plafond APPLIQUÉ    : {{ sentinel_bornage_mesure.stdout_lines | default(['NON MESURÉ (--check)']) | join(' · ') }}"
+      - "interlock (cond. 2) : {{ 'ARMÉ' if sentinel_bornage_interlock_enabled | bool else 'posé, DÉSARMÉ (défaut du dépôt)' }}"
+      - "état relève lu dans : {{ hq_failover_state_file }}{{ '' if hq_failover_state_confirme | bool else '  ⚠️ CHEMIN NON CONFIRMÉ' }}"
+      - "sur état inconnu    : {{ sentinel_bornage_interlock_sur_inconnu }}"
+      - "points signalés     : {{ sentinel_bornage_points_signales | length }}"
+
+# Le contrôle qui empêche « le plafond est posé » de vouloir dire « le fichier
+# existe ». `infinity` est la valeur que systemd rend quand aucune limite n'est
+# appliquée : la voir ici signifie que le drop-in n'a pas pris.
+- name: Refuser un plafond annoncé mais non appliqué
+  ansible.builtin.assert:
+    that:
+      - sentinel_bornage_mesure.stdout is not search('MemoryMax=infinity')
+    fail_msg: >-
+      PLAFOND NON APPLIQUÉ : systemd rend MemoryMax=infinity pour
+      {{ sentinel_bornage_unite }}, alors que le drop-in demande
+      {{ sentinel_bornage_memory_max }}. Le fichier existe et la limite non —
+      c'est exactement la condition « déclarative plutôt que vérifiable »
+      qu'ADR-003 refuse. Vérifier que `daemon-reload` a bien eu lieu, et que le
+      nom de l'unité est le bon ({{ sentinel_bornage_unite }}).
+    success_msg: "plafond : appliqué et mesuré — condition 1 d'ADR-003 vérifiée"
+    quiet: true
+  when:
+    - not ansible_check_mode
+    - sentinel_bornage_mesure.rc | default(1) == 0
+
+- name: Points signalés et NON joués — à reprendre par un humain
+  ansible.builtin.debug:
+    msg: "SIGNALÉ, NON JOUÉ — {{ item }}"
+  loop: "{{ sentinel_bornage_points_signales }}"
+  when: sentinel_bornage_points_signales | length > 0
+
+- name: Rappeler qu'en --check les plafonds n'ont pas été mesurés
+  ansible.builtin.debug:
+    msg: >-
+      NON MESURÉ en --check : les plafonds réellement appliqués. La condition 1
+      d'ADR-003 se vérifie sur la machine, par
+      « systemctl show {{ sentinel_bornage_unite }} -p MemoryMax », après apply.
+      Un --check vert ne la démontre pas.
+  when: ansible_check_mode

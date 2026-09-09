@@ -1,0 +1,62 @@
+---
+# Armement de l'INTERLOCK seulement.
+#
+# Le plafond (condition 1) n'est pas concerné : il est déjà appliqué par
+# `10_pose.yml`. Ce qui s'arme ici, c'est l'automate qui ARRÊTE le serveur
+# central quand la relève de HQ s'arme (condition 2).
+#
+#   ansible-playbook playbooks/01_server.yml \
+#     -e '{"sentinel_bornage_interlock_enabled": true}'
+#
+# `00_garde.yml` a déjà refusé si le chemin de l'état de la relève n'est pas
+# confirmé : on n'arme pas un automate sur un chemin deviné.
+
+# L'état de la relève doit être LISIBLE au moment d'armer. Armer un interlock
+# qui ne sait pas lire ce qu'il surveille, c'est poser un dispositif qui rendra
+# « inconnu » à chaque passage — et un dispositif qui crie sans arrêt finit
+# désactivé, ce qui est le contraire du but.
+# On vérifie le RÉPERTOIRE, pas le fichier. Le fichier absent est un état
+# légitime — « relève au repos ». C'est son répertoire qui doit exister et être
+# lisible : sans lui, l'interlock ne peut pas distinguer « au repos » de « je
+# n'ai pas pu regarder », et ces deux-là ne sont pas le même état.
+- name: Vérifier que le répertoire de l'état de la relève est lisible
+  ansible.builtin.stat:
+    path: "{{ hq_failover_state_file | dirname }}"
+  register: sentinel_bornage_dir_releve
+  become: true
+  failed_when: false
+  changed_when: false
+
+- name: Refuser d'armer l'interlock si cet emplacement n'est pas lisible
+  ansible.builtin.fail:
+    msg: >-
+      ARMEMENT REFUSÉ : le répertoire de l'état de la relève
+      ({{ hq_failover_state_file | dirname }}) est absent ou illisible. Le
+      FICHIER peut manquer — la relève est alors au repos, et c'est normal —
+      mais sans son répertoire, l'interlock ne distingue plus « au repos » de
+      « je n'ai pas pu regarder ». Il rendrait « inconnu » à chaque passage, et
+      un dispositif qui crie sans arrêt finit désactivé : le contraire du but.
+      Un `ok` n'est pas un `inconnu` (.agent/RULES.md § 1). Confirmer le chemin
+      côté HQ (P00.5) avant d'armer.
+  when: >-
+    'stat' not in sentinel_bornage_dir_releve
+    or not sentinel_bornage_dir_releve.stat.exists
+
+- name: Activer et démarrer le timer de l'interlock
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_bornage_interlock_timer }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Consigner que l'interlock a été armé
+  ansible.builtin.debug:
+    msg: >-
+      ARMÉ : {{ sentinel_bornage_interlock_timer }} sur {{ inventory_hostname }},
+      cadence {{ sentinel_bornage_interlock_cadence }}, comportement sur état
+      inconnu = « {{ sentinel_bornage_interlock_sur_inconnu }} ».
+      Cet automate ARRÊTE le serveur central quand la relève de HQ s'arme ; il
+      ne la lit que, et ne l'arme, ne la désarme et ne la retarde jamais
+      (docs/contrat-hq.md). Mettre à jour le tableau d'armement de
+      .agent/ACTIVE.md.

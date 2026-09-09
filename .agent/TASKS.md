@@ -182,8 +182,21 @@ partie, toujours.**
       agent — écrite **avant** le premier week-end, pas après. Motif : le défaut
       réseau récidivant de `patator-standby` (4 occurrences connues). Livre le
       noyau du moteur de bruit, généralisé en `P02.2`.
-- [ ] **P01.4** (claude) Bornage des ressources (`cgroup`) et, l'hôte étant le
-      standby, arrêt automatique du serveur central quand la relève s'arme (`C3`).
+- [~] **P01.4** (claude, 2026-09-09) Rôle `sentinel_bornage` — les deux
+      conditions vérifiables d'`ADR-003`, avec deux régimes **différents** :
+      le **plafond** `cgroup` est une contrainte (posé sans garde, appliqué à
+      chaud sans redémarrer, puis **relu par `systemctl show`** — le rôle échoue
+      si `MemoryMax` revient à `infinity`, car un drop-in sans `daemon-reload`
+      est un fichier et pas une limite) ; l'**interlock** de relève est un
+      automate, donc **livré désarmé**. Trois états testés : relève armée →
+      arrêt · au repos → silence · **inconnu → `signaler` par défaut**, parce
+      qu'agir sur une mesure non prise est ce que `RULES` § 1 interdit et que le
+      plafond borne déjà le risque. Ne se coche qu'au vert de la CI **et** après
+      un `--check --diff` réel.
+      ⚠️ **Armement de l'interlock bloqué** par `hq_failover_state_confirme:
+      false` : le contrat de frontière nomme l'objet « état de la relève » mais
+      pas le fichier qui le porte (`scripts/failover.py` / `ADR-061`, côté HQ).
+      Le chemin actuel est une hypothèse. **Se confirme avec `P00.5`.**
 - [ ] **P01.9** (cursor) Rapports hebdomadaires conformité (`D3`) et
       vulnérabilités (`D4`), **lecture seule**, unités `sentinel-*` livrées
       désarmées — [brief](briefs/P01.9-rapports-hebdomadaires.md).

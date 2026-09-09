@@ -1,0 +1,13 @@
+---
+# Métadonnées du rôle `sentinel_bornage`.
+
+galaxy_info:
+  author: 40KT1 — Sentinelle
+  description: >-
+    Bornage cgroup permanent du serveur central et interlock de relève —
+    conditions 1 et 2 d'ADR-003. Le plafond est appliqué ; l'interlock est
+    livré DÉSARMÉ.
+  license: proprietary
+  min_ansible_version: "2.17"
+
+dependencies: []

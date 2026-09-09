@@ -55,7 +55,20 @@
   # sur une machine de production sans que personne n'y pense.
   serial: 1
 
+  # L'ORDRE COMPTE : le plafond avant ce qu'il plafonne.
+  #
+  # `sentinel_bornage` pose la limite `cgroup` (condition 1 d'ADR-003) et la
+  # rend effective par `daemon-reload`. `sentinel_server` REFUSE ensuite de
+  # s'armer si cette limite n'est pas là. L'inverse laisserait une fenêtre où
+  # le moteur peut démarrer sans plafond sur une machine de 16 Go qui porte le
+  # miroir Postgres et la relève.
+  #
+  # Le drop-in peut précéder l'unité qu'il surcharge : systemd le rattache au
+  # `daemon-reload` suivant. Poser la contrainte d'abord ne coûte donc rien.
   roles:
+    - role: sentinel_bornage
+      tags:
+        - sentinel_bornage
     - role: sentinel_server
       tags:
         - sentinel_server

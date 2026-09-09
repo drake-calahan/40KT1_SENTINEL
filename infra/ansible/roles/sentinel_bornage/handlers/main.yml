@@ -1,0 +1,16 @@
+---
+# Handlers du rôle `sentinel_bornage`.
+#
+# Ce rôle ne REDÉMARRE rien, et c'est le point : systemd applique les limites
+# d'un cgroup à chaud après `daemon-reload`. Borner le serveur central ne
+# demande donc pas de l'interrompre — ce qui permet à ce rôle d'être rejoué sur
+# une machine en production sans rien redémarrer (docs/contrat-hq.md § 3).
+#
+# Il n'y a donc pas de handler « redémarrer ». S'il en apparaît un, c'est que
+# quelqu'un a perdu cette propriété : la revue doit le refuser.
+
+- name: Recharger le gestionnaire de services
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+  listen: recharger le gestionnaire de services

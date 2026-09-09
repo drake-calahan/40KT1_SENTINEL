@@ -1,0 +1,26 @@
+---
+# Invariants du rôle `sentinel_bornage`.
+
+sentinel_bornage_prefixe_unites: "sentinel-"
+
+# Les unités que ce rôle a le droit de manipuler. `wazuh-manager.service` n'y
+# est PAS : ce rôle le BORNE (drop-in + daemon-reload), il ne le démarre ni ne
+# le redémarre. Poser un plafond ne demande pas de redémarrer le service —
+# systemd applique les limites d'un cgroup à chaud. C'est ce qui permet à ce
+# rôle d'être rejoué sur une machine en production sans rien redémarrer.
+sentinel_bornage_unites_autorisees:
+  - "sentinel-interlock-releve.service"
+  - "sentinel-interlock-releve.timer"
+
+sentinel_bornage_unites_de_hq:
+  - "40kt1-*"
+  - "docker"
+  - "containerd"
+  - "tailscaled"
+  - "ssh"
+  - "ufw"
+
+# Valeurs acceptées pour le comportement sur état inconnu.
+sentinel_bornage_sur_inconnu_valides:
+  - "signaler"
+  - "arreter"
