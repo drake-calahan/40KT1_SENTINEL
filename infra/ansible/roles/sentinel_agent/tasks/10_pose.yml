@@ -1,0 +1,189 @@
+---
+# Pose de l'agent : dépôt vérifié, paquet épinglé, configuration, enrôlement.
+# CE FICHIER NE DÉMARRE RIEN.
+
+- name: Convertir la cadence FIM en secondes pour syscheck
+  ansible.builtin.set_fact:
+    sentinel_agent_fim_frequency_seconds: >-
+      {{
+        (sentinel_fim_scan_interval[:-1] | int * 3600)
+        if sentinel_fim_scan_interval is match('^[0-9]+h$')
+        else (
+          (sentinel_fim_scan_interval[:-1] | int * 60)
+          if sentinel_fim_scan_interval is match('^[0-9]+m$')
+          else (sentinel_fim_scan_interval | int)
+        )
+      }}
+  changed_when: false
+
+- name: Créer le répertoire des trousseaux
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Télécharger la clé du dépôt dans un fichier temporaire
+  ansible.builtin.get_url:
+    url: "{{ sentinel_agent_repo_key_url }}"
+    dest: /tmp/sentinel-agent-repo-key.asc
+    mode: "0644"
+  become: true
+  register: sentinel_agent_cle_telechargee
+  check_mode: false
+
+- name: Relever l'empreinte de la clé effectivement servie
+  ansible.builtin.command:
+    cmd: gpg --show-keys --with-colons /tmp/sentinel-agent-repo-key.asc
+  become: true
+  register: sentinel_agent_empreinte_relevee
+  changed_when: false
+  check_mode: false
+
+- name: L'empreinte servie correspond à l'empreinte attendue
+  ansible.builtin.assert:
+    that:
+      - sentinel_agent_empreinte_relevee.stdout is search(sentinel_agent_repo_key_fingerprint)
+    fail_msg: >-
+      EMPREINTE NON CONFORME. La clé servie par {{ sentinel_agent_repo_key_url }}
+      ne porte pas l'empreinte attendue ({{ sentinel_agent_repo_key_fingerprint }}).
+      NE PAS INSTALLER. Prévenir le PO.
+    success_msg: "empreinte de la clé de dépôt : conforme"
+    quiet: true
+
+- name: Poser la clé du dépôt dans son propre trousseau
+  ansible.builtin.command:
+    cmd: >-
+      gpg --batch --yes --dearmor
+      -o /usr/share/keyrings/sentinel-wazuh.gpg
+      /tmp/sentinel-agent-repo-key.asc
+    creates: /usr/share/keyrings/sentinel-wazuh.gpg
+  become: true
+
+- name: Retirer la clé temporaire
+  ansible.builtin.file:
+    path: /tmp/sentinel-agent-repo-key.asc
+    state: absent
+  become: true
+
+- name: Déclarer le dépôt de paquets du moteur
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/sentinel-wazuh.gpg]
+      {{ sentinel_agent_repo_url }} {{ sentinel_agent_repo_suite }}
+      {{ sentinel_agent_repo_composant }}
+    filename: sentinel-wazuh
+    state: present
+    update_cache: true
+  become: true
+
+- name: Épingler la version de l'agent au niveau d'apt
+  ansible.builtin.template:
+    src: apt-preferences-wazuh.j2
+    dest: /etc/apt/preferences.d/sentinel-wazuh-agent.pref
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Interdire tout démarrage de service pendant l'installation
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      # Posé par 40KT1_SENTINEL, rôle sentinel_agent, le temps de l'installation.
+      exit 101
+    dest: /usr/sbin/policy-rc.d
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Installer l'agent, à la version épinglée
+  ansible.builtin.apt:
+    name: "{{ sentinel_agent_paquet }}={{ sentinel_agent_wazuh_version }}-*"
+    state: present
+    update_cache: true
+  become: true
+  notify: redemarrer l agent
+
+- name: Geler la version contre les mises à jour automatiques
+  ansible.builtin.dpkg_selections:
+    name: "{{ sentinel_agent_paquet }}"
+    selection: hold
+  become: true
+
+- name: Lever l'interdiction de démarrage
+  ansible.builtin.file:
+    path: /usr/sbin/policy-rc.d
+    state: absent
+  become: true
+
+- name: Recharger le gestionnaire de services sans rien démarrer
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+- name: S'assurer que l'agent n'est ni activé ni démarré
+  ansible.builtin.systemd_service:
+    name: "{{ sentinel_agent_unite }}"
+    enabled: false
+    state: stopped
+  become: true
+  when: not (sentinel_agent_enabled | bool)
+
+- name: Rendre la configuration de l'agent
+  ansible.builtin.template:
+    src: ossec.conf.j2
+    dest: "{{ sentinel_agent_ossec_conf }}"
+    owner: "{{ sentinel_agent_owner }}"
+    group: "{{ sentinel_agent_group }}"
+    mode: "{{ sentinel_agent_config_mode }}"
+    backup: true
+  become: true
+  notify: redemarrer l agent
+
+- name: Relever si l'agent est déjà enrôlé
+  ansible.builtin.stat:
+    path: "{{ sentinel_agent_client_keys }}"
+  register: sentinel_agent_cle_client
+  become: true
+  changed_when: false
+
+- name: Établir l'état d'enrôlement
+  ansible.builtin.set_fact:
+    sentinel_agent_deja_enrolle: >-
+      {{
+        'stat' in sentinel_agent_cle_client
+        and sentinel_agent_cle_client.stat.exists
+        and (sentinel_agent_cle_client.stat.size | default(0) | int) > 0
+      }}
+  changed_when: false
+
+- name: Enrôler l'agent auprès du serveur central
+  ansible.builtin.command:
+    cmd: >-
+      {{ sentinel_agent_ossec_dir }}/bin/agent-auth
+      -m {{ sentinel_agent_server_host }}
+      -A {{ sentinel_agent_enroll_key }}
+    creates: "{{ sentinel_agent_client_keys }}"
+  become: true
+  no_log: true
+  when:
+    - not sentinel_agent_deja_enrolle
+    - not ansible_check_mode
+  check_mode: false
+  register: sentinel_agent_enrolement
+  changed_when: sentinel_agent_enrolement.rc == 0
+
+- name: Signaler l'enrôlement reporté en --check
+  ansible.builtin.set_fact:
+    sentinel_agent_points_signales: >-
+      {{ sentinel_agent_points_signales + [
+           "Enrôlement NON JOUÉ en --check : l'agent n'est pas encore enrôlé. "
+           ~ "Un apply explicite (ordre PO) exécutera agent-auth."
+         ] }}
+  when:
+    - not sentinel_agent_deja_enrolle
+    - ansible_check_mode

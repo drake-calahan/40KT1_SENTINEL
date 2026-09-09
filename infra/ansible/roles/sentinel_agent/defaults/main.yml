@@ -1,0 +1,44 @@
+---
+# Rôle `sentinel_agent` — agent Wazuh sur les nœuds Linux du parc.
+# Décidé par ADR-001 (moteur) ; enrôlé auprès du serveur central de P01.0.
+#
+# Tout ce qui est ici se surcharge. Les invariants sont dans `vars/main.yml`.
+
+# --- La garde d'armement ----------------------------------------------------
+# `false`, et cette valeur NE CHANGE JAMAIS dans le dépôt (`RULES` § 1).
+# Désarmé : paquet posé, configuration rendue, enrôlement fait — mais l'unité
+# n'est NI activée NI démarrée.
+#
+# Armer : ansible-playbook playbooks/02_agent.yml -e '{"sentinel_agent_enabled": true}'
+sentinel_agent_enabled: false
+
+# --- Version de l'agent — ÉPINGLÉE, à un seul endroit -----------------------
+# Même version MAJEURE que `sentinel_server_wazuh_version` (4.7.5) dans
+# roles/sentinel_server/defaults/main.yml. Manager et agents partagent la
+# version majeure ; toute divergence casse l'enrôlement ou la collecte.
+sentinel_agent_wazuh_version: "4.7.5"
+
+# Empreinte de la clé de dépôt — même source que le rôle serveur.
+sentinel_agent_repo_key_url: "https://packages.wazuh.com/key/GPG-KEY-WAZUH"
+
+# ⚠️ EMPREINTE NON CONFIRMÉE — recopiée de mémoire, PAS relevée sur la source
+# officielle. Le rôle REFUSE de s'exécuter tant que le drapeau ci-dessous vaut
+# `false`. Marche à suivre dans roles/sentinel_server/defaults/main.yml § clé.
+sentinel_agent_repo_key_fingerprint: "0DCFCA5547B19D2A6099506096B3EE5F29111145"  # gitleaks:allow
+sentinel_agent_repo_key_confirmee: false
+sentinel_agent_repo_url: "https://packages.wazuh.com/4.x/apt/"
+sentinel_agent_repo_composant: "main"
+sentinel_agent_repo_suite: "stable"
+
+# --- Le `.env` de la machine ------------------------------------------------
+# `SENTINEL_ENROLL_KEY` et `SENTINEL_SERVER_HOST` y vivent — jamais ici.
+sentinel_agent_env_file: "{{ sentinel_install_dir }}/.env"
+
+# --- Propriété des fichiers posés -------------------------------------------
+sentinel_agent_owner: "root"
+sentinel_agent_group: "wazuh"
+sentinel_agent_config_mode: "0640"
+
+# --- Désinstallation --------------------------------------------------------
+sentinel_agent_desinstaller: false
+sentinel_agent_purger_etat: false

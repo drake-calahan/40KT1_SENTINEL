@@ -1,0 +1,69 @@
+{#
+  Configuration de l'agent — 40KT1_SENTINEL, rôle `sentinel_agent`.
+
+  PHASE 1 (A2, D5) : OBSERVATION SEULE. Aucune alerte poussée, aucune réponse.
+  La liste FIM vient de `sentinel_fim_realtime_paths` (group_vars) — le rôle
+  ne la recopie pas. Docker et auditd sont lus, jamais configurés ici (HQ).
+#}
+<!--
+  ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle sentinel_agent).
+  Modifier plutôt :
+    infra/ansible/roles/sentinel_agent/templates/ossec.conf.j2
+    infra/ansible/inventory/group_vars/all/main.yml (liste FIM)
+
+  Hôte    : {{ inventory_hostname }}
+  Version : {{ sentinel_agent_wazuh_version }} (épinglée)
+  Manager : {{ sentinel_agent_server_host }} (MagicDNS, lu depuis le .env)
+-->
+<ossec_config>
+
+  <client>
+    <server>
+      <address>{{ sentinel_agent_server_host }}</address>
+      <port>1514</port>
+      <protocol>tcp</protocol>
+    </server>
+    <config-profile>ubuntu, ubuntu22, ubuntu22.04</config-profile>
+    <notify_time>10</notify_time>
+    <time-reconnect>60</time-reconnect>
+    <auto_restart>yes</auto_restart>
+  </client>
+
+  <!-- ══ INTÉGRITÉ (D1) — liste courte depuis group_vars ═══════════════════ -->
+  <syscheck>
+    <disabled>no</disabled>
+    <frequency>{{ sentinel_agent_fim_frequency_seconds }}</frequency>
+    <scan_on_start>yes</scan_on_start>
+{% for chemin in sentinel_fim_realtime_paths %}
+    <directories realtime="yes" report_changes="yes">{{ chemin }}</directories>
+{% endfor %}
+  </syscheck>
+
+  <!-- ══ JOURNAUX SYSTÈME — lecture seule ═════════════════════════════════ -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/auth.log</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog</location>
+  </localfile>
+
+  <!-- auditd — la configuration d'auditd appartient à HQ ; on lit seulement -->
+  <localfile>
+    <log_format>audit</log_format>
+    <location>/var/log/audit/audit.log</location>
+  </localfile>
+
+  <!-- Docker — la stack Docker appartient à HQ ; on lit seulement -->
+  <wodle name="docker-listener">
+    <disabled>no</disabled>
+    <interval>1m</interval>
+    <attempts>5</attempts>
+    <run_on_start>yes</run_on_start>
+  </wodle>
+
+  <!-- Aucun bloc <active-response> : ADR-002 § 6, cinq portes. -->
+
+</ossec_config>

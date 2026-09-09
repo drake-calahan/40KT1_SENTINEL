@@ -1,0 +1,16 @@
+# ATTENTION — FICHIER GÉRÉ PAR ANSIBLE (40KT1_SENTINEL, rôle « sentinel_agent »).
+# Source : infra/ansible/roles/sentinel_agent/templates/apt-preferences-wazuh.j2
+#
+# Épingle la version de l'agent. Sans cet épinglage, `unattended-upgrades`
+# remplace l'agent une nuit, sans décision humaine, sur une machine de production.
+
+Package: {{ sentinel_agent_paquet }}
+Pin: version {{ sentinel_agent_wazuh_version }}-*
+Pin-Priority: 1001
+
+{% for paquet in sentinel_agent_paquets_interdits %}
+
+Package: {{ paquet }}
+Pin: origin ""
+Pin-Priority: -1
+{% endfor %}

@@ -1,0 +1,127 @@
+---
+# Préconditions du rôle `sentinel_agent`.
+
+- name: La garde d'armement est un booléen, pas une chaîne
+  ansible.builtin.assert:
+    that:
+      - sentinel_agent_enabled is defined
+      - sentinel_agent_enabled is boolean
+    fail_msg: >-
+      « sentinel_agent_enabled » n'est pas un booléen
+      ({{ sentinel_agent_enabled | default(None) | type_debug }}). Une chaîne
+      non vide est VRAIE en Jinja : « -e sentinel_agent_enabled=false » armerait
+      l'agent en croyant le désarmer. Forme correcte :
+      -e '{"sentinel_agent_enabled": true}'. Voir .agent/RULES.md § 1.
+    quiet: true
+
+- name: Cet hôte appartient au groupe `sentinel_agents_linux`
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups['sentinel_agents_linux']
+    fail_msg: >-
+      {{ inventory_hostname }} n'appartient pas au groupe « sentinel_agents_linux »
+      ({{ groups['sentinel_agents_linux'] | default([]) | join(', ') | default('vide', true) }}).
+      Ce rôle ne s'exécute que sur les endpoints Linux du parc.
+    quiet: true
+
+- name: L'empreinte de la clé de dépôt a été relevée sur la source officielle
+  ansible.builtin.assert:
+    that:
+      - sentinel_agent_repo_key_confirmee | bool
+    fail_msg: >-
+      L'empreinte de la clé du dépôt de paquets n'a PAS été confirmée
+      (sentinel_agent_repo_key_confirmee = false). Ce rôle ajoute un dépôt
+      tiers à une machine de production : sans empreinte vérifiée, on installe
+      la menace n° 2 du classement B1. Marche à suivre dans
+      roles/sentinel_agent/defaults/main.yml, au-dessus de la variable.
+    quiet: true
+
+- name: Le chemin de la stack HQ vient de l'inventaire
+  ansible.builtin.assert:
+    that:
+      - hq_stack_dir is defined
+      - hq_stack_dir | length > 0
+    fail_msg: >-
+      « hq_stack_dir » n'est pas défini pour {{ inventory_hostname }}. Ce chemin
+      diffère d'un nœud à l'autre (/srv/40kt1 sur la tour,
+      /home/calahan/40KT1_HQ sur le standby) : il se LIT dans l'inventaire, il
+      ne se devine pas.
+    quiet: true
+
+- name: Lire le `.env` de la machine
+  ansible.builtin.slurp:
+    src: "{{ sentinel_agent_env_file }}"
+  register: sentinel_agent_env_brut
+  become: true
+  failed_when: false
+  changed_when: false
+  no_log: true
+
+- name: Établir l'état du `.env` — présent / absent / illisible
+  ansible.builtin.set_fact:
+    sentinel_agent_env_etat: >-
+      {{ 'lisible' if 'content' in sentinel_agent_env_brut else 'absent ou illisible' }}
+
+- name: Extraire la clé d'enrôlement du `.env`
+  ansible.builtin.set_fact:
+    sentinel_agent_enroll_key: >-
+      {{ (sentinel_agent_env_brut.content | b64decode)
+         | regex_search('(?m)^\s*SENTINEL_ENROLL_KEY\s*=\s*(\S+)', '\1')
+         | first | default('') }}
+  no_log: true
+  when: sentinel_agent_env_etat == 'lisible'
+
+- name: Extraire l'adresse MagicDNS du serveur central du `.env`
+  ansible.builtin.set_fact:
+    sentinel_agent_server_host: >-
+      {{ (sentinel_agent_env_brut.content | b64decode)
+         | regex_search('(?m)^\s*SENTINEL_SERVER_HOST\s*=\s*(\S+)', '\1')
+         | first | default('') }}
+  when: sentinel_agent_env_etat == 'lisible'
+
+- name: La clé d'enrôlement est présente dans le `.env` de la machine
+  ansible.builtin.assert:
+    that:
+      - sentinel_agent_env_etat == 'lisible'
+      - sentinel_agent_enroll_key | default('') | length > 0
+    fail_msg: >-
+      SENTINEL_ENROLL_KEY est absente ou vide dans {{ sentinel_agent_env_file }}
+      (état du fichier : {{ sentinel_agent_env_etat }}). Ce rôle NE POURSUIT PAS :
+      un agent installé et non enrôlé est un faux vert. Marche à suivre : copier
+      .env.example vers {{ sentinel_agent_env_file }} sur la machine, y poser la
+      clé (générée, jamais recopiée d'ailleurs), mode 0600, propriétaire root.
+      La valeur ne passe NI par le dépôt, NI par l'inventaire, NI par un -e.
+    quiet: true
+  no_log: true
+
+- name: L'adresse du serveur central est déclarée dans le `.env`
+  ansible.builtin.assert:
+    that:
+      - sentinel_agent_env_etat == 'lisible'
+      - sentinel_agent_server_host | default('') | length > 0
+    fail_msg: >-
+      SENTINEL_SERVER_HOST est absente ou vide dans {{ sentinel_agent_env_file }}
+      (état du fichier : {{ sentinel_agent_env_etat }}). Le serveur central n'est
+      joignable que par le tailnet (MagicDNS), jamais par une IP publique en dur.
+      Poser le nom MagicDNS du serveur central dans le `.env` de la machine.
+    quiet: true
+
+- name: Lire le témoin de mode tournoi (posé par HQ, jamais par nous)
+  ansible.builtin.stat:
+    path: "{{ hq_tournament_mode_file }}"
+  register: sentinel_agent_temoin_tournoi
+  become: true
+  failed_when: false
+  changed_when: false
+
+- name: Établir l'état du mode tournoi — actif / inactif / inconnu
+  ansible.builtin.set_fact:
+    sentinel_agent_mode_tournoi: >-
+      {{
+        'inconnu' if ('stat' not in sentinel_agent_temoin_tournoi)
+        else ('actif' if sentinel_agent_temoin_tournoi.stat.exists else 'inactif')
+      }}
+
+- name: Ouvrir la liste des points signalés mais non joués
+  ansible.builtin.set_fact:
+    sentinel_agent_points_signales: []

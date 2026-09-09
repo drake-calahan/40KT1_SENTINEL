@@ -1,0 +1,29 @@
+---
+# Bilan du rôle `sentinel_agent` — portée : l'hôte courant.
+
+- name: Bilan de l'agent sur cet hôte
+  ansible.builtin.debug:
+    msg:
+      - "hôte              : {{ inventory_hostname }}"
+      - "armement          : {{ 'ARMÉ' if sentinel_agent_enabled | bool else 'désarmé (défaut du dépôt)' }}"
+      - "version épinglée  : {{ sentinel_agent_wazuh_version }}"
+      - "manager (MagicDNS): {{ sentinel_agent_server_host | default('non résolu') }}"
+      - >-
+        enrôlement        : {{ 'déjà en place' if sentinel_agent_deja_enrolle | default(false)
+                               else 'effectué ou en attente' }}
+      - "mode tournoi (HQ) : {{ sentinel_agent_mode_tournoi }}"
+      - "chemins FIM       : {{ sentinel_fim_realtime_paths | length }} (group_vars)"
+      - "points signalés   : {{ sentinel_agent_points_signales | length }}"
+
+- name: Points signalés et NON joués — à reprendre par un humain
+  ansible.builtin.debug:
+    msg: "SIGNALÉ, NON JOUÉ — {{ item }}"
+  loop: "{{ sentinel_agent_points_signales }}"
+  when: sentinel_agent_points_signales | length > 0
+
+- name: Rappeler qu'un état est resté inconnu
+  ansible.builtin.debug:
+    msg: >-
+      INCONNU au terme de ce rôle : le mode tournoi de HQ n'a pas pu être lu
+      ({{ hq_tournament_mode_file }}). Aucune conclusion ne s'en tire.
+  when: sentinel_agent_mode_tournoi == 'inconnu'
