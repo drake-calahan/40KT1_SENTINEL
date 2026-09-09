@@ -1,0 +1,38 @@
+<!--
+  P01.2 — Clés SSH, configuration SSH et sudoers (liste courte D1).
+  Chemins surveillés : voir sentinel_fim_realtime_paths dans group_vars/all/main.yml.
+  INTERDIT d'exclure authorized_keys — même pendant un déploiement ou une sauvegarde.
+-->
+<group name="syscheck,sentinel,integrite,cles,">
+
+  <!--
+    Attrape toute modification, ajout ou suppression du fichier authorized_keys.
+    Un renouvellement de clé planifié par le PO peut déclencher à tort s'il n'a pas été annoncé.
+  -->
+  <rule id="100101" level="14">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">authorized_keys$</field>
+    <description>Intégrité (critique) : clés SSH autorisées modifiées</description>
+  </rule>
+
+  <!--
+    Attrape toute modification d'un fichier sous /etc/ssh/ (sshd_config, clés hôte, etc.).
+    Un redémarrage d'OpenSSH sans changement de fichier ne déclenche pas ; une mise à jour de paquet oui.
+  -->
+  <rule id="100102" level="11">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">^/etc/ssh/</field>
+    <description>Intégrité (rouge) : configuration ou clés hôte SSH modifiées</description>
+  </rule>
+
+  <!--
+    Attrape toute modification de sudoers ou d'un fragment sous /etc/sudoers.d/.
+    Un déploiement Ansible qui ajuste les droits d'élévation légitimement peut déclencher à tort.
+  -->
+  <rule id="100103" level="12">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">^/etc/sudoers(\.d/|$)</field>
+    <description>Intégrité (rouge) : règles sudo ou fragments modifiés</description>
+  </rule>
+
+</group>

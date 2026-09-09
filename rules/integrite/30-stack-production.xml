@@ -1,0 +1,71 @@
+<!--
+  P01.2 — Stack HQ en production : .env, docker-compose, scripts (liste courte D1).
+  Chemins surveillés : voir sentinel_fim_realtime_paths dans group_vars/all/main.yml.
+  INTERDIT d'exclure le .env HQ — même pendant un déploiement, une sauvegarde ou un mirror-sync.
+  (authorized_keys est couvert par 10-cles-et-acces.xml et n'est jamais exclu non plus.)
+  Exclusions level 0 = enfants de 100122 (scripts) : un frère de 550 ne coupe pas l'alerte.
+-->
+<group name="syscheck,sentinel,integrite,stack,">
+
+  <!--
+    Attrape toute modification du .env de la stack HQ (tower /srv/40kt1 ou standby ~/40KT1_HQ).
+    Un déploiement qui ajuste une variable d'environnement légitimement déclenche — c'est voulu, jamais exclu.
+  -->
+  <rule id="100120" level="12">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">(?i)(40kt1|40KT1_HQ)/\.env$</field>
+    <description>Intégrité (rouge) : fichier .env de la stack HQ modifié</description>
+  </rule>
+
+  <!--
+    Attrape toute modification du docker-compose.yml de la stack HQ.
+    Un déploiement git pull + docker compose up légitime modifie ce fichier et peut déclencher à tort en phase 1.
+  -->
+  <rule id="100121" level="11">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">(?i)(40kt1|40KT1_HQ)/docker-compose\.ya?ml$</field>
+    <description>Intégrité (rouge) : docker-compose.yml de la stack HQ modifié</description>
+  </rule>
+
+  <!--
+    Attrape toute modification d'un script sous le répertoire scripts/ de la stack HQ.
+    Un déploiement ou une correction hotfix légitime touche scripts/ et peut déclencher à tort en observation.
+  -->
+  <rule id="100122" level="11">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">(?i)(40kt1|40KT1_HQ)/scripts/</field>
+    <description>Intégrité (rouge) : script de la stack HQ modifié</description>
+  </rule>
+
+  <!--
+    Exclusion : bytecode Python généré sous scripts/ lors d'un déploiement ou d'un git pull.
+    Motif : docker compose build ou pip install recrée __pycache__ et .pyc sans changer la logique métier.
+  -->
+  <rule id="100155" level="0">
+    <if_sid>100122</if_sid>
+    <field name="file" type="pcre2">(__pycache__|\.pyc$)</field>
+    <description>Exclusion : bytecode Python sous scripts/ HQ (déploiement git pull)</description>
+  </rule>
+
+  <!--
+    Exclusion : fichiers temporaires d'éditeur sous scripts/ pendant une session de dev.
+    Motif restreint : swap vim (.<nom>.swp) et sauvegarde nano (.save) — pas de .tmp libre.
+  -->
+  <rule id="100156" level="0">
+    <if_sid>100122</if_sid>
+    <field name="file" type="pcre2">/\.[^/]+\.sw[a-z]?$|\.save$</field>
+    <description>Exclusion : swap vim / sauvegarde nano sous scripts/ HQ</description>
+  </rule>
+
+  <!--
+    Exclusion : artefacts nommés de l'ingest scraper sous scripts/ HQ.
+    Motif volontairement étroit (ingest.cache / ingest.tmp) — un .cache ou .tmp
+    générique sous scripts/ reste une alerte.
+  -->
+  <rule id="100157" level="0">
+    <if_sid>100122</if_sid>
+    <field name="file" type="pcre2">ingest\.(cache|tmp)$</field>
+    <description>Exclusion : cache/tmp d'ingest scraper sous scripts/ HQ</description>
+  </rule>
+
+</group>
