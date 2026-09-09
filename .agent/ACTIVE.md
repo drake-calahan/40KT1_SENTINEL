@@ -24,14 +24,24 @@ central), `P01.4` (bornage + interlock), `P03.6` (les quatre gestes), `P03.1`
 (relais) et `P02.2` (moteur de bruit). **Aucun n'est coché** — ils attendent le
 vert de la CI sur la PR.
 
-Ce qui part maintenant : **`P01.2`** (`cursor` — elle ne dépend que de `P00.2`,
-faite : elle n'attend ni le gabarit ni le rôle serveur) · **porter le jumeau du
-contrat dans HQ** (`P00.5`, dernière moitié — dépôt tiers).
+**2026-09-09, revue de la PR #10** : `P01.2` (règles d'intégrité, `cursor`) est
+**acceptée sur le fond**, avec **trois corrections demandées avant fusion** et
+deux suites hors lot ouvertes (`P01.11`, `P01.12`, toutes deux dans `P01.1`).
+
+Ce qui part maintenant : **`P01.1`** (`cursor` — rôle `sentinel_agent`, débloqué
+par la fusion de `P01.6` et `P01.0` sur `main`, brief passé à **prêt**) ·
+**porter le jumeau du contrat dans HQ** (`P00.5`, dernière moitié — dépôt
+tiers).
 
 **Six questions attendent le PO** — aucune ne bloque `cursor`, toutes bloquent
 un armement : `P00.11` et `P00.12` (la garde `garde-armement` ne voit pas
 `yes` / `on`, mesuré ; et elle n'est pas obligatoire à la fusion) · `P01.10`
-(le mineur du moteur décide de la source de `D4`, **bloque `P01.9`**) ·
+(le mineur du moteur décide de la source de `D4`, **bloque `P01.9`** — le
+**relevé est rendu** le 2026-09-09,
+[`docs/releves/P01.10`](../docs/releves/P01.10-mineur-du-moteur-et-D4.md) :
+la coupure est à `4.8.0`, notre épingle `4.7.5` produit `D4` sans indexeur mais
+gèle le moteur à ~2 ans de correctifs ; **trois issues chiffrées, l'arbitrage
+est au PO**) ·
 `P03.7` (liste des conteneurs non arrêtables) · `P03.8` (la quarantaine refuse
 l'arborescence de HQ, conformément au contrat — et c'est gênant) · `P03.9`
 (confirmer l'enveloppe de réponse active).
