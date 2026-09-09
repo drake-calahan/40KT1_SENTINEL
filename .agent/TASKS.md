@@ -60,12 +60,30 @@ partie, toujours.**
 >
 > **Aucun de ces six ne se coche avant le vert de la CI sur la PR.**
 >
+> **2026-09-09, troisième temps — les PR #10, #11 et #12 sont fusionnées.**
+> `P01.2` (règles d'intégrité) a été relue, **trois corrections demandées**,
+> **rendues par `cursor` et fusionnées** (détail sur la ligne `P01.2`). Deux
+> suites **hors lot** restent ouvertes ci-dessus (`P01.11`, `P01.12`) : elles
+> appartiennent à `P01.1`, parce que ce qui manque est dans
+> `sentinel_fim_realtime_paths` et non dans `rules/`.
+>
+> `P00.11` (garde `garde-armement`) est fusionnée elle aussi, **et prolongée** :
+> le motif livré bloquait bien les quatre cas du brief `P00.8`, mais sept formes
+> tout aussi valides passaient encore — `TRUE`, `YES`, `ON`, `y`, `1` côté
+> armement, `OFF` et `0` côté `dry_run`. La garde matche désormais la **classe**
+> booléenne (YAML 1.1, toutes casses, formes courtes) plutôt qu'une liste
+> d'orthographes, et une borne de fin de valeur supprime au passage un faux
+> positif (`enabled: yesterday_placeholder`). Mesuré dans les deux sens.
+>
 > **La suite, en parallèle** :
-> - `cursor` → **`P01.2`** (règles d'intégrité). Elle ne dépend **que** de
->   `P00.2`, qui est faite : elle part **maintenant**, sans attendre le gabarit
->   ni le rôle serveur — `rules/` et `infra/ansible/` sont deux zones
->   distinctes ([`P02`](../docs/plans/P02-lancement-implementation.md) § 6).
-> - `claude` → `P01.6` (en cours), puis `P01.0`.
+> - `cursor` → **`P01.1`** (rôle `sentinel_agent`). **Débloqué et délégué le
+>   2026-09-09** : `P01.6` (gabarit) et `P01.0` (rôle serveur) sont sur `main`
+>   depuis la PR #9, et le brief est passé au statut **prêt**. Deuxième lot,
+>   petit et indépendant, si `P01.1` attend une réponse : **`P00.11`** (garde
+>   `garde-armement` élargie aux formes booléennes) — zone `.github/`, aucune
+>   collision.
+> - `claude` → `P01.10` **relevé rendu** (l'arbitrage est au PO) ; ensuite
+>   `P01.3`, qui attend `P01.1`.
 >
 > **Plus bloqué** : plus rien côté décisions — les trois ADR sont *Acceptées* et
 > l'amorce est sur `main`.
@@ -126,12 +144,48 @@ partie, toujours.**
       `defaults` »), et il passe. Étendre le motif à
       `true|yes|on|True|Yes|On` (et `false|no|off|…` pour `dry_run`), guillemets
       optionnels, puis **rejouer les quatre cas d'acceptation du brief `P00.8`**.
+      **Fait et fusionné (PR #11), puis prolongé en revue (PR #12)** : le motif
+      livré bloquait les quatre cas du brief mais laissait passer `TRUE`, `YES`,
+      `ON`, `y`, `1` et, côté `dry_run`, `OFF` et `0` — mesuré. La garde matche
+      désormais la **classe** booléenne (`grep -i`, formes courtes) et non une
+      liste d'orthographes, sans quoi la prochaine variante rouvre le trou. Une
+      borne de fin de valeur a été ajoutée : elle supprime un faux positif
+      antérieur (`sentinel_desc_enabled: yesterday_placeholder` déclenchait), et
+      une garde qui crie à tort finit désarmée.
       *Le gabarit `P01.6` impose déjà `false` littéral côté rôle ; cette garde
       est la ceinture, pas les bretelles.*
 - [ ] **P00.12** (PO) Rendre `garde-armement` **obligatoire** dans le ruleset
       `main-protection`, aux côtés des trois workflows de `P00.6`. Un contrôle
       qui échoue mais ne bloque pas la fusion est un avis, pas une garde — et
       `RULES` § 1 ne demande pas un avis. **Geste d'exploitation : PO.**
+
+## Suites de la revue de `P01.2` — ouvertes le 2026-09-09
+
+> Relevées en relisant la PR #10 (`cursor`, règles d'intégrité). **Ni l'une ni
+> l'autre n'est un défaut du lot** : les deux règles concernées sont bien
+> écrites, et leur auteur a signalé la première en commentaire XML. Ce qui
+> manque est ailleurs — dans `sentinel_fim_realtime_paths`, dont `P01.2` n'est
+> pas l'écrivain. Les trois corrections demandées *dans* le lot restent sur la
+> PR, pas ici.
+
+- [ ] **P01.11** (cursor, à traiter **dans `P01.1`**) Les règles de `P01.2`
+      surveillent des chemins que l'agent ne regarde pas. Deux cas mesurés sur
+      la PR #10 : `100131` vise `/usr/bin/sudo.ws`, absent de
+      `sentinel_fim_realtime_paths` — la règle ne mesurera **rien** ; `100130`
+      ne couvre que `/usr/bin/tailscale`, alors que `/usr/sbin/tailscaled` est
+      le démon **privilégié** et n'est pas surveillé. Pour chacun : ajouter le
+      chemin à la liste, **ou** retirer la règle. Une règle qui ne peut pas
+      recevoir d'événement est un faux vert silencieux — `RULES` § 1.
+- [ ] **P01.12** (cursor, à traiter **dans `P01.1`**) **La seule règle
+      `critique` du dépôt est aveugle à `root`.** `sentinel_fim_realtime_paths`
+      ne déclare que le `authorized_keys` de l'utilisateur Ansible
+      (`{{ HOME }}/.ssh/authorized_keys`). La règle `100101` est correctement
+      écrite — son motif attrape n'importe quel chemin — mais l'agent ne lui
+      enverra jamais d'événement pour `/root/.ssh/authorized_keys` ni pour les
+      autres comptes. Or « modification d'`authorized_keys` » est le premier des
+      **trois cas `critique`** de `F2`. Étendre la surveillance à `/root/.ssh/`
+      et aux comptes humains du parc, puis **rejouer le cas** : toucher un
+      `authorized_keys` de `root` doit produire un événement.
 
 ## Phase 1 — Observation seule
 
@@ -170,23 +224,36 @@ partie, toujours.**
       de la clé de dépôt (le rôle **refuse** de tourner tant que
       `sentinel_server_repo_key_confirmee` est `false`) et poser le `.env` avec
       `SENTINEL_ENROLL_KEY`. Voir le [README du rôle](../infra/ansible/roles/sentinel_server/README.md).
-- [ ] **P01.10** (claude — relevé · **PO — l'arbitrage**) **`D4` et le mineur du
-      moteur.** Le détecteur de vulnérabilités de Wazuh a été redessiné au cours
-      de la série 4.x, et la version redessinée stocke ses résultats dans
-      l'**indexeur** — que le profil frugal n'installe pas (`ADR-001`). Selon le
-      mineur retenu (`4.7.5` aujourd'hui, à un seul endroit :
-      `sentinel_server_wazuh_version`), le rapport hebdomadaire de
-      vulnérabilités de `D4` est soit produisible localement, soit à produire
-      autrement. **Ce point n'est pas vérifié** — il est ouvert ici parce qu'il
-      se découvrirait sinon au milieu de `P01.9`, moteur déjà posé sur une
-      machine de production et version gelée. Relever le comportement réel,
-      puis trancher : rester sur un mineur qui s'en passe · produire `D4`
-      autrement en lecture seule · rouvrir `ADR-001` sur le profil.
-      **Bloque `P01.9`**, pas `P01.1`.
+- [~] **P01.10** (**relevé fait** — claude, 2026-09-09 · **l'arbitrage reste au
+      PO**) **`D4` et le mineur du moteur.** Relevé :
+      [`docs/releves/P01.10`](../docs/releves/P01.10-mineur-du-moteur-et-D4.md).
+      **La coupure est à `4.8.0`** (12 juin 2024) : avant, les résultats de
+      vulnérabilités vivent dans une base **locale** du manager et l'API du
+      manager sait les lire ; à partir de `4.8.0`, ils sont poussés vers
+      l'**indexeur** — que le profil frugal n'installe pas (`ADR-001`) — et les
+      points de sortie `/vulnerability` de l'API du manager sont **supprimés**.
+      Notre épingle est `4.7.5`, donc **`D4` est productible sans indexeur** et
+      `ADR-001` tient. **Le coût est ailleurs** : `4.7.5` est de 2024, la branche
+      courante est `4.14.7` (29 juillet 2026) — rester dessus, c'est poser sur
+      deux machines de production un composant privilégié figé à ~2 ans de
+      correctifs. Trois issues chiffrées au relevé § 6 (rester pré-`4.8` ·
+      monter et produire `D4` autrement · rouvrir `ADR-001`).
+      **Aucune valeur n'a été changée** : `sentinel_server_wazuh_version` reste
+      `4.7.5` — la changer avant l'arbitrage serait trancher en douce.
+      **Bloque `P01.9`**, pas `P01.1` ni `P01.2` ni `P01.8`.
+      *Une exigence en est déjà sortie et ne dépend d'aucun arbitrage : le
+      rapport `D4` doit distinguer « aucune vulnérabilité » de « aucune donnée »
+      — portée dans le brief `P01.9`.*
 - [x] **P01.2** (cursor, 2026-09-09) Règles d'intégrité (`rules/integrite/`) sur la liste
       courte de `D1` — [brief](briefs/P01.2-regles-integrite.md). Fixe les plages
       d'identifiants et la correspondance sévérité ↔ niveau pour tous les lots de
-      règles suivants.
+      règles suivants. **Fusionné (PR #10) après les trois corrections de
+      revue** : `100110` ne recouvre plus `/etc/ssh/` ni `/etc/sudoers` (la
+      précédence est écrite dans la règle, plus dans l'ordre d'inclusion) ·
+      `100154` visait `/etc/logrotate.status`, qui n'existe pas sur Ubuntu, et
+      vise désormais `/etc/logrotate.d/` · `100150` couvre les artefacts `ucf`.
+      Les motifs d'exclusion trop larges (`.tmp`, `.cache`) ont été resserrés
+      sur les artefacts réels.
 - [ ] **P01.1** (cursor) Rôle `sentinel_agent` — agents sur `patator-tower` et
       `patator-standby`, enrôlement par clé, aucun redémarrage de service de
       production déclenché par le rôle —

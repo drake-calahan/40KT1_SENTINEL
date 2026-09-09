@@ -25,9 +25,17 @@ fi
 # Motifs refusés (espaces optionnels autour du séparateur ; guillemets optionnels).
 # Ansible écrit souvent yes/on/True — le littéral true seul laissait passer le
 # mode de panne mesuré en P00.11 (2026-09-09). dry_run : false/no/off/… = armement.
-TRUE_VAL="['\"]?(true|yes|on|True|Yes|On)['\"]?"
-FALSE_VAL="['\"]?(false|no|off|False|No|Off)['\"]?"
-PATTERN="sentinel_[a-z_]*_enabled[[:space:]]*:[[:space:]]*${TRUE_VAL}|SENTINEL_[A-Z_]*_ENABLED[[:space:]]*=[[:space:]]*${TRUE_VAL}|sentinel_response_dry_run[[:space:]]*:[[:space:]]*${FALSE_VAL}|SENTINEL_RESPONSE_DRY_RUN[[:space:]]*=[[:space:]]*${FALSE_VAL}"
+#
+# On matche la CLASSE, pas une liste d'orthographes : YAML 1.1 admet
+# y|yes|n|no|on|off|true|false dans toutes les casses, et Ansible accepte 1/0.
+# Énumérer les casses une par une, c'est rouvrir le trou de P00.11 à la
+# prochaine variante — d'où grep -i et les formes courtes.
+TRUE_VAL="['\"]?(true|yes|on|y|1)['\"]?"
+FALSE_VAL="['\"]?(false|no|off|n|0)['\"]?"
+# Fin de valeur : espaces, fermeture de mapping en flux, commentaire, fin de
+# ligne. Sans cette borne, « enabled: yesterday » déclencherait à tort.
+VAL_END="[[:space:]]*[},]*[[:space:]]*(#.*)?$"
+PATTERN="sentinel_[a-z_]*_enabled[[:space:]]*:[[:space:]]*${TRUE_VAL}${VAL_END}|SENTINEL_[A-Z_]*_ENABLED[[:space:]]*=[[:space:]]*${TRUE_VAL}${VAL_END}|sentinel_response_dry_run[[:space:]]*:[[:space:]]*${FALSE_VAL}${VAL_END}|SENTINEL_RESPONSE_DRY_RUN[[:space:]]*=[[:space:]]*${FALSE_VAL}${VAL_END}"
 
 # Chemins exclus : un runbook doit pouvoir montrer la commande d'armement.
 is_excluded() {
@@ -71,7 +79,8 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
   if [[ "${line}" == +* && "${line}" != +++* ]]; then
     if [[ -n "${current_file}" ]] && ! is_excluded "${current_file}"; then
       content="${line:1}"
-      if echo "${content}" | grep -E -q "${PATTERN}"; then
+      # -i : la casse d'un booléen YAML ne change pas ce qu'il arme.
+      if echo "${content}" | grep -E -i -q "${PATTERN}"; then
         echo "Armement détecté dans ${current_file}:${new_line}" >&2
         echo "  ${content}" >&2
         found=1
