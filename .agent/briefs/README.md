@@ -55,7 +55,7 @@ existe pour éviter.
 | [`P01.9`](P01.9-rapports-hebdomadaires.md) | Rapports conformité + vulnérabilités | `cursor` | en attente (`P01.1`) |
 | [`P02.0`](P02.0-cablage-alerte.md) | Câblage de l'alerte | `cursor` | en attente (`P01.5`) |
 | [`P02.1`](P02.1-grille-severite.md) | Grille de sévérité | `cursor` | en attente (`P02.0`) |
-| [`P03.2`](P03.2-runbook-mode-a-blanc.md) | Runbook du mode à blanc | `cursor` | esquisse |
+| [`P03.2`](P03.2-runbook-mode-a-blanc.md) | Runbook du mode à blanc | `cursor` | prêt |
 | [`P03.3`](P03.3-runbook-desarmement.md) | Runbook de désarmement testé | `cursor` | esquisse |
 
 Les lots de `claude` n'ont pas de brief ici : leur conception vit dans l'ADR ou

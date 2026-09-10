@@ -11,6 +11,7 @@
 |---|---|---|
 | [`mise-en-service.md`](mise-en-service.md) | Installer le serveur central et les agents, en observation seule | `ADR-003` acceptée |
 | [`armement-de-la-reponse.md`](armement-de-la-reponse.md) | Passer de l'observation à l'alerte, puis à la réponse | phases `P1` et `P2` sorties |
+| [`mode-a-blanc.md`](mode-a-blanc.md) | Lire le journal de réponse sans laisser jouer de geste | exécuteur installé en dry-run |
 | [`desarmement-d-urgence.md`](desarmement-d-urgence.md) | Arrêter le dispositif quand il se trompe | dès que quoi que ce soit est armé |
 
 ## L'ordre n'est pas décoratif
