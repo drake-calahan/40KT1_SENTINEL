@@ -47,6 +47,32 @@
   conteneur reste joignable depuis le LAN malgré `deny incoming`. Consigné dans
   `roles/host_baseline/tasks/40_firewall.yml` de HQ. **Ne pas relire ces règles
   en croyant le port fermé.**
+- ⚠️ **`docker events` ne porte pas privileged / mounts / ports.** Relevé en
+  revue de `P01.8` (2026-09-10) : le wodle `docker-listener` relaie le flux
+  `docker events` ; pour un `create`/`start`, `Actor.Attributes` contient les
+  **labels**, plus `image` et `name` — rien d'autre. Pas d'attribut
+  `privileged`, pas de liste de montages, pas de mapping de ports ; un
+  bind-mount de `/var/run/docker.sock` ne produit pas d'événement `volume`.
+  **Implication** : les cas « conteneur `--privileged` », « socket monté » et
+  « port sur `0.0.0.0` » (celui que `ufw` ne voit pas) **ne se détectent pas**
+  depuis ce flux. Une règle Wazuh sur ces champs serait un faux vert silencieux.
+  Il faut une sonde d'inspection (`docker inspect` périodique) ou du FIM/auditd
+  sur le `docker-compose.yml` — lot `P01.17`.
+
+### Options de règle Wazuh : `<srcuser>` / `<dstuser>` refusés
+
+*2026-09-10 (revue P01.8 tour 2 + logtest 4.14.7).* Les balises `<srcuser>` et
+`<dstuser>` **ne sont pas** des options de règle : `analysisd` répond
+`Invalid option 'srcuser' for rule` et **refuse de charger le fichier entier**
+(issues upstream [#19879](https://github.com/wazuh/wazuh/issues/19879),
+[#868](https://github.com/wazuh/wazuh-ruleset/issues/868)). `<field name="srcuser">`
+échoue aussi (`Field 'srcuser' is static`). Seul `<user>` (alias de `dstuser`)
+est documenté côté règle ; pour filtrer le compte qui *élève* un sudo, il faut
+un `<regex>` / `<match>` sur le message **après** décodage (le préfixe `sudo:`
+n'y est plus). `<srcip>` reste une option valide, **mais une seule CIDR par
+balise** : `100.64.0.0/10,192.168.1.0/24` est refusé (`Invalid ip address`) —
+mesuré `wazuh-manager:4.14.7`. Idiome : alerte + exclusions `level="0"` par
+réseau.
 - Exposition publique par **tunnel sortant cloudflared** ; un seul connecteur à
   la fois (ADR-030 de HQ).
 - Les deux nœuds sont à **70 km** l'un de l'autre : ni compteur électrique, ni

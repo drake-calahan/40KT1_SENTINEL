@@ -1,0 +1,42 @@
+<!--
+  P01.8 — sudo et session root SSH.
+  Journaux lus : /var/log/auth.log (localfile syslog, rôle sentinel_agent).
+  Comptes sudo attendus (maintenance PO / Ansible) : calahan, root — ancrés en PCRE2.
+  <srcuser>/<dstuser> ne sont pas des options de règle (analysisd refuse le fichier) ;
+  le compte qui élève se lit dans le message sudo via <regex type="pcre2">
+  (après décodage le préfixe « sudo: » a disparu du champ log — ancrer sur le compte).
+  100205 vit dans 10-ssh-acces.xml (chaîne sur exclusions CIDR).
+  5403 (First time sudo / FTS) précède souvent 5402 au premier usage — inclus ici.
+-->
+<group name="syslog,sudo,pam,sentinel,authentification,">
+
+  <!--
+    Attrape toute élévation sudo réussie vers root par un compte hors ^calahan$ et ^root$.
+    Une maintenance sous un autre compte admin temporaire peut déclencher à tort — ajouter le compte ici, ne pas baisser la sévérité.
+  -->
+  <rule id="100203" level="11">
+    <if_sid>5402,5403,5407</if_sid>
+    <regex type="pcre2">^\s*(?!calahan|root)\S+\s+:.*USER=root</regex>
+    <description>Authentification (rouge) : élévation sudo par un compte inattendu</description>
+  </rule>
+
+  <!--
+    Attrape trois échecs consécutifs d'élévation sudo pour un même utilisateur (règle mère Wazuh 5404).
+    Un mot de passe saisi de travers ou un script mal écrit peut déclencher à tort lors d'un dépannage.
+  -->
+  <rule id="100204" level="8">
+    <if_sid>5404</if_sid>
+    <description>Authentification (orange) : échecs d'élévation sudo répétés</description>
+  </rule>
+
+  <!--
+    Exclusion : échecs sudo du compte système _apt lors des mises à jour nocturnes.
+    Motif : unattended-upgrades tente parfois des élévations qui échouent sans être une attaque.
+  -->
+  <rule id="100251" level="0">
+    <if_sid>100204</if_sid>
+    <regex type="pcre2">^\s*_apt\s+:</regex>
+    <description>Exclusion : échecs sudo _apt (unattended-upgrades)</description>
+  </rule>
+
+</group>

@@ -9,8 +9,8 @@
 ```
 rules/
 ├── integrite/        fichiers sous scellé (D1) — .env, authorized_keys, unités
-├── authentification/ SSH, sudo, sources jamais vues
-├── docker/           conteneur privilégié, socket monté, port publié
+├── authentification/ SSH, sudo, sources jamais vues (P01.8)
+├── docker/           exec prod + image inconnue (P01.8) ; privileged/socket/0.0.0.0 → P01.17
 ├── conformite/       dérive de durcissement (règle ufw disparue, service réactivé)
 └── agents/           santé des agents — dont l'anti-rafale du standby
 ```
