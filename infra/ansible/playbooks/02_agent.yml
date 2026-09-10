@@ -102,7 +102,14 @@
     - always
 
   vars:
-    vises: "{{ groups['sentinel_agents_linux'] | default([]) }}"
+    # L'hôte du serveur central est retiré ICI AUSSI : sans cela, le bilan
+    # annoncerait « visés 2 / atteints 1 » et se lirait comme un nœud manqué,
+    # alors que ce nœud est exclu par construction (conflit de paquet, P01.21).
+    # Un bilan qui compte autre chose que ce que le play a visé apprend à
+    # ignorer les bilans.
+    exclus: "{{ groups['sentinel_server'] | default([]) }}"
+    vises: >-
+      {{ (groups['sentinel_agents_linux'] | default([])) | difference(exclus) }}
     atteints: >-
       {{ vises | map('extract', hostvars)
                | selectattr('ansible_facts.distribution', 'defined')
@@ -114,6 +121,10 @@
         msg:
           - "visés    ({{ vises | length }}) : {{ vises | join(', ') }}"
           - "atteints ({{ atteints | length }}) : {{ atteints | join(', ') | default('AUCUN', true) }}"
+          - >-
+            exclus   ({{ exclus | length }}) : {{ exclus | join(', ') | default('aucun', true) }}
+            — hôte(s) du serveur central : pas d'agent, le manager se surveille
+            lui-même (P01.21)"
 
     - name: Refuser de conclure si aucun hôte n'a été atteint
       ansible.builtin.assert:
