@@ -342,6 +342,13 @@ partie, toujours.**
       `P01.12` (alignement `sentinel_fim_realtime_paths`).
 - [~] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
       [brief](briefs/P01.8-regles-auth-docker.md).
+      *Revue PR #17 (2026-09-10) : retiré privileged / socket / port `0.0.0.0`
+      du lot — hors flux `docker events` ; manque consignés → `P01.17`.*
+- [ ] **P01.17** (cursor) Sonde d'inspection Docker (lecture seule) : détecter
+      conteneur `--privileged`, montage de `docker.sock`, port publié sur
+      `0.0.0.0` — cas que `docker events` / `P01.8` ne voient pas
+      ([`DISCOVERY.md`](DISCOVERY.md) § réseau). Unité `sentinel-*` désarmée ;
+      `ok` / `ko` / `unknown`. Hors périmètre : configurer le démon (HQ).
 - [ ] **P01.3** (claude) Règle **anti-rafale** pour la perte de contact d'un
       agent. **Le noyau est livré** (`bruit/`, voir `P02.2`) et le cas du standby
       est rejoué en test : 6 h de panne sondée à la minute → **25 alertes au lieu

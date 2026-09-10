@@ -47,6 +47,17 @@
   conteneur reste joignable depuis le LAN malgré `deny incoming`. Consigné dans
   `roles/host_baseline/tasks/40_firewall.yml` de HQ. **Ne pas relire ces règles
   en croyant le port fermé.**
+- ⚠️ **`docker events` ne porte pas privileged / mounts / ports.** Relevé en
+  revue de `P01.8` (2026-09-10) : le wodle `docker-listener` relaie le flux
+  `docker events` ; pour un `create`/`start`, `Actor.Attributes` contient les
+  **labels**, plus `image` et `name` — rien d'autre. Pas d'attribut
+  `privileged`, pas de liste de montages, pas de mapping de ports ; un
+  bind-mount de `/var/run/docker.sock` ne produit pas d'événement `volume`.
+  **Implication** : les cas « conteneur `--privileged` », « socket monté » et
+  « port sur `0.0.0.0` » (celui que `ufw` ne voit pas) **ne se détectent pas**
+  depuis ce flux. Une règle Wazuh sur ces champs serait un faux vert silencieux.
+  Il faut une sonde d'inspection (`docker inspect` périodique) ou du FIM/auditd
+  sur le `docker-compose.yml` — lot `P01.17`.
 - Exposition publique par **tunnel sortant cloudflared** ; un seul connecteur à
   la fois (ADR-030 de HQ).
 - Les deux nœuds sont à **70 km** l'un de l'autre : ni compteur électrique, ni

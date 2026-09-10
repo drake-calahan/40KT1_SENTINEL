@@ -4,27 +4,27 @@
   Sources connues (phase 1, liste écrite — pas d'apprentissage auto) :
     · tailnet Tailscale tail29e268.ts.net → plage CGNAT 100.64.0.0/10
     · LAN secours 192.168.1.0/24
-  Exclusions level 0 = enfants de la règle d'alerte visée.
+    · loopback 127.0.0.0/8
+  srcip / srcuser / dstuser : balises statiques Wazuh (pas <field name="…">).
 -->
 <group name="syslog,sshd,sentinel,authentification,ssh,">
 
   <!--
-    Attrape huit échecs d'authentification SSH depuis la même adresse IP en deux minutes.
+    Reprend la règle built-in 5712 (8 échecs SSH / 120 s, même source) et porte la sévérité du dépôt.
     Un balayage Internet ordinaire ferait crier à tort — ici le nœud n'est joignable que par le tailnet et le LAN.
   -->
-  <rule id="100201" level="8" frequency="8" timeframe="120">
-    <if_matched_sid>5710,5716,5718</if_matched_sid>
-    <same_source_ip />
+  <rule id="100201" level="8">
+    <if_sid>5712</if_sid>
     <description>Authentification (orange) : rafale d'échecs SSH depuis une même source</description>
   </rule>
 
   <!--
-    Attrape toute connexion SSH réussie dont l'adresse source n'est ni tailnet (100.64.0.0/10) ni LAN secours (192.168.1.0/24).
-    Une nouvelle machine du PO ou une adresse tailnet nouvelle non encore inscrite ici peut déclencher à tort — mettre à jour la liste.
+    Attrape toute connexion SSH réussie dont l'adresse source n'est ni tailnet, ni LAN secours, ni loopback.
+    Une nouvelle machine du PO ou une adresse tailnet hors CGNAT non encore inscrite ici peut déclencher à tort — mettre à jour la liste CIDR.
   -->
   <rule id="100202" level="14">
     <if_sid>5715</if_sid>
-    <field name="srcip" type="pcre2">^(?!100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|192\.168\.1\.|127\.)</field>
+    <srcip negate="yes">100.64.0.0/10,192.168.1.0/24,127.0.0.0/8</srcip>
     <description>Authentification (critique) : connexion SSH réussie depuis une source jamais vue</description>
   </rule>
 

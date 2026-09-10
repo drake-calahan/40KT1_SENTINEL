@@ -2,17 +2,17 @@
   P01.8 — sudo et sessions root interactives.
   Journaux lus : /var/log/auth.log (localfile syslog, rôle sentinel_agent).
   Comptes sudo attendus (maintenance PO / Ansible) : calahan, root.
-  Exclusions level 0 = enfants de la règle d'alerte visée.
+  Sur 5402 (Successful sudo to ROOT), le compte qui élève est srcuser ; dstuser vaut root par construction.
 -->
 <group name="syslog,sudo,pam,sentinel,authentification,">
 
   <!--
-    Attrape toute élévation sudo réussie par un compte hors calahan et root.
-    Une maintenance Ansible ou une session du PO sous calahan peut encore déclencher si le champ user diffère (sudo.ws, alias).
+    Attrape toute élévation sudo réussie vers root par un compte hors calahan et root.
+    Une maintenance sous un autre compte admin temporaire peut déclencher à tort — ajouter le compte ici, ne pas baisser la sévérité.
   -->
   <rule id="100203" level="11">
     <if_sid>5402,5407</if_sid>
-    <field name="user" type="pcre2">^(?!calahan$|root$)</field>
+    <srcuser negate="yes">calahan,root</srcuser>
     <description>Authentification (rouge) : élévation sudo par un compte inattendu</description>
   </rule>
 
@@ -31,7 +31,7 @@
   -->
   <rule id="100251" level="0">
     <if_sid>100204</if_sid>
-    <field name="user">^_apt$</field>
+    <srcuser>_apt</srcuser>
     <description>Exclusion : échecs sudo _apt (unattended-upgrades)</description>
   </rule>
 
@@ -41,7 +41,7 @@
   -->
   <rule id="100205" level="11">
     <if_sid>5715,5501</if_sid>
-    <field name="dstuser">^root$</field>
+    <dstuser>root</dstuser>
     <description>Authentification (rouge) : session root interactive</description>
   </rule>
 
