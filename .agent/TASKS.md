@@ -523,7 +523,15 @@ alerte réelle traitée de bout en bout.
       [brief](briefs/P03.2-runbook-mode-a-blanc.md) ·
       [`docs/runbooks/mode-a-blanc.md`](../docs/runbooks/mode-a-blanc.md).
       *Pas encore jouable sur machine : rien d'installé ; le format journal est
-      celui de `responder/executeur.py`.*
+      celui de `responder/executeur.py`. Revue : distinguer désarmé / à blanc via
+      `armement` ; budget compte mais gel non collant → `P03.10`.*
+- [ ] **P03.10** (claude) **Gel collant en mode à blanc** — `budget.geler()` n'est
+      appelé que sur les chemins où le geste a été *joué* ; en `aurait_execute`,
+      le témoin `budget-gele` n'est jamais posé et le gel se relâche avec la
+      fenêtre. Appeler `geler()` quand `etat_budget is DERNIER` sur le chemin
+      dry-run, ou documenter pourquoi non. Révélé par la revue de `P03.2`.
+      *Bonus* : aligner le docstring de `responder/config.py` (`_VRAI` /
+      `_FAUX`, pas « true » littéral seul).
 - [ ] **P03.3** (cursor + PO) Runbook de désarmement d'urgence **testé depuis un
       téléphone** — [brief](briefs/P03.3-runbook-desarmement.md).
       *Brief encore esquisse : attend `P03.2` livré et un témoin lu pour de vrai.*
