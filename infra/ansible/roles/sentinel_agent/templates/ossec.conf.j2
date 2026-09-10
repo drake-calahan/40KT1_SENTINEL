@@ -37,6 +37,9 @@
 {% for chemin in sentinel_fim_realtime_paths %}
     <directories realtime="yes" report_changes="yes">{{ chemin }}</directories>
 {% endfor %}
+{% for chemin in sentinel_fim_nodiff_paths | default([]) %}
+    <nodiff>{{ chemin }}</nodiff>
+{% endfor %}
   </syscheck>
 
   <!-- ══ JOURNAUX SYSTÈME — lecture seule ═════════════════════════════════ -->

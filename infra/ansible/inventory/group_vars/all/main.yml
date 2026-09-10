@@ -117,16 +117,29 @@ sentinel_server_cpu_quota: "40%"
 sentinel_fim_realtime_paths:
   - /etc
   - "{{ hq_stack_dir }}/.env"
-  - "{{ ansible_facts['env']['HOME'] | default('/home/' ~ ansible_user) }}/.ssh/authorized_keys"
-  # P01.12 — cas critique F2 : clés SSH de root (règle 100101)
+  # P01.12 — cas critique F2 (règle 100101). Ne pas s'appuyer seul sur
+  # ansible_facts.env.HOME : sous become, HOME vaut souvent /root et le
+  # compte humain (ansible_user, inventaire) disparaît de la surveillance.
+  - "/home/{{ ansible_user }}/.ssh/authorized_keys"
   - /root/.ssh/authorized_keys
   - /etc/systemd/system
   - "{{ hq_stack_dir }}/docker-compose.yml"
   - "{{ hq_stack_dir }}/scripts"
   - /usr/bin/tailscale
-  # P01.11 — démon privilégié Tailscale (règle 100130 ne couvrait que le CLI)
+  # P01.11 — démon privilégié Tailscale (règle 100132)
   - /usr/sbin/tailscaled
   # P01.11 — binaire sudo Ubuntu 26.04 (règle 100131)
+  - /usr/bin/sudo.ws
+
+# Chemins dont le *contenu* ne doit jamais voyager dans une alerte
+# (report_changes=yes sur la liste ci-dessus joint le diff). Sans <nodiff>,
+# le .env de HQ — secrets d'enrôlement inclus — partirait dans le webhook.
+sentinel_fim_nodiff_paths:
+  - "{{ hq_stack_dir }}/.env"
+  - "/home/{{ ansible_user }}/.ssh/authorized_keys"
+  - /root/.ssh/authorized_keys
+  - /usr/bin/tailscale
+  - /usr/sbin/tailscaled
   - /usr/bin/sudo.ws
 
 # Balayage complet, cadence lente (D2).
