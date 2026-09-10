@@ -1,18 +1,20 @@
 <!--
-  P01.8 — sudo et sessions root interactives.
+  P01.8 — sudo et session root SSH.
   Journaux lus : /var/log/auth.log (localfile syslog, rôle sentinel_agent).
-  Comptes sudo attendus (maintenance PO / Ansible) : calahan, root.
-  Sur 5402 (Successful sudo to ROOT), le compte qui élève est srcuser ; dstuser vaut root par construction.
+  Comptes sudo attendus (maintenance PO / Ansible) : calahan, root — ancrés en PCRE2.
+  <srcuser>/<dstuser> ne sont pas des options de règle (analysisd refuse le fichier) ;
+  le compte qui élève se lit dans le message sudo via <regex type="pcre2">.
+  100205 ne couvre que SSH root (5715) : 5501 PAM tire aussi sur cron/systemd — bruit.
 -->
 <group name="syslog,sudo,pam,sentinel,authentification,">
 
   <!--
-    Attrape toute élévation sudo réussie vers root par un compte hors calahan et root.
+    Attrape toute élévation sudo réussie vers root par un compte hors ^calahan$ et ^root$.
     Une maintenance sous un autre compte admin temporaire peut déclencher à tort — ajouter le compte ici, ne pas baisser la sévérité.
   -->
   <rule id="100203" level="11">
     <if_sid>5402,5407</if_sid>
-    <srcuser negate="yes">calahan,root</srcuser>
+    <regex type="pcre2">sudo:\s+(?!calahan|root)\S+\s+:</regex>
     <description>Authentification (rouge) : élévation sudo par un compte inattendu</description>
   </rule>
 
@@ -31,18 +33,18 @@
   -->
   <rule id="100251" level="0">
     <if_sid>100204</if_sid>
-    <srcuser>_apt</srcuser>
+    <regex type="pcre2">sudo:\s+_apt\s+:</regex>
     <description>Exclusion : échecs sudo _apt (unattended-upgrades)</description>
   </rule>
 
   <!--
-    Attrape une session interactive ouverte pour root (SSH direct, su ou sudo -i).
-    Un dépannage du PO en root est légitime — à consigner, jamais à ignorer.
+    Attrape une connexion SSH réussie en tant que root (seul cas vraiment interactif mesurable ici).
+    Un dépannage du PO en root SSH est légitime — à consigner, jamais à ignorer. su / sudo -i : hors lot.
   -->
   <rule id="100205" level="11">
-    <if_sid>5715,5501</if_sid>
-    <dstuser>root</dstuser>
-    <description>Authentification (rouge) : session root interactive</description>
+    <if_sid>5715</if_sid>
+    <user>^root$</user>
+    <description>Authentification (rouge) : session root interactive SSH</description>
   </rule>
 
 </group>

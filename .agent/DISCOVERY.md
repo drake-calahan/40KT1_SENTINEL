@@ -58,6 +58,17 @@
   depuis ce flux. Une règle Wazuh sur ces champs serait un faux vert silencieux.
   Il faut une sonde d'inspection (`docker inspect` périodique) ou du FIM/auditd
   sur le `docker-compose.yml` — lot `P01.17`.
+
+### Options de règle Wazuh : `<srcuser>` / `<dstuser>` refusés
+
+*2026-09-10 (revue P01.8 tour 2).* Les balises `<srcuser>` et `<dstuser>`
+**ne sont pas** des options de règle : `analysisd` répond
+`Invalid option 'srcuser' for rule` et **refuse de charger le fichier entier**
+(issues upstream [#19879](https://github.com/wazuh/wazuh/issues/19879),
+[#868](https://github.com/wazuh/wazuh-ruleset/issues/868)). `<field name="srcuser">`
+échoue aussi (`Field 'srcuser' is static`). Seul `<user>` (alias de `dstuser`)
+est documenté côté règle ; pour filtrer le compte qui *élève* un sudo, il faut
+un `<regex>` / `<match>` sur le message. `<srcip>` reste une option valide.
 - Exposition publique par **tunnel sortant cloudflared** ; un seul connecteur à
   la fois (ADR-030 de HQ).
 - Les deux nœuds sont à **70 km** l'un de l'autre : ni compteur électrique, ni

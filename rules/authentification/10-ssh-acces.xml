@@ -5,16 +5,18 @@
     · tailnet Tailscale tail29e268.ts.net → plage CGNAT 100.64.0.0/10
     · LAN secours 192.168.1.0/24
     · loopback 127.0.0.0/8
-  srcip / srcuser / dstuser : balises statiques Wazuh (pas <field name="…">).
+  Options de règle : <srcip> et <user> (alias dstuser) sont documentées ;
+  <srcuser>/<dstuser> comme balises de règle sont refusées par analysisd.
 -->
 <group name="syslog,sshd,sentinel,authentification,ssh,">
 
   <!--
-    Reprend la règle built-in 5712 (8 échecs SSH / 120 s, même source) et porte la sévérité du dépôt.
+    Reprend les composites built-in 5712 (utilisateur inexistant) et 5720 (échecs
+    d'auth sur compte existant) — 8 / 120 s, même source — et porte la sévérité du dépôt.
     Un balayage Internet ordinaire ferait crier à tort — ici le nœud n'est joignable que par le tailnet et le LAN.
   -->
   <rule id="100201" level="8">
-    <if_sid>5712</if_sid>
+    <if_sid>5712,5720</if_sid>
     <description>Authentification (orange) : rafale d'échecs SSH depuis une même source</description>
   </rule>
 

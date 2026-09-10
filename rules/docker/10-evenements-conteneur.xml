@@ -2,11 +2,17 @@
   P01.8 — Événements Docker lus par docker-listener (wodle, rôle sentinel_agent).
   Stack de production : projet Compose fortyk (fortyk-caddy, fortyk-db, fortyk-api,
   fortyk-cloudflared, fortyk-scraper). Sentinelle lit le démon, ne le configure pas (HQ).
-  Images connues (phase 1, liste écrite) : dernier segment exact =
-    caddy · postgres · postgis · cloudflared · scraper · wazuh · fortyk.
+  Images connues (phase 1) : dernier segment exact =
+    caddy · postgres · postgis · cloudflared · scraper · wazuh ·
+    fortyk-api · fortyk-db · fortyk-caddy · fortyk-cloudflared · fortyk-scraper.
+  Le dépôt/registry n'est pas filtré (evil.example/library/caddy:2 passerait) — acceptable
+  en observation ; à resserrer plus tard si le bruit ou la surface l'exige.
   Hors portée du flux docker events (pas d'attribut privileged / mounts / ports) :
     conteneur privileged, socket docker.sock monté, port publié sur 0.0.0.0 :
     voir DISCOVERY.md et TASKS#P01.17 (sonde d'inspection).
+  Exclusion unattended-upgrades : écartée — l'événement Docker ne porte jamais ces
+  chaînes (code mort si on l'écrivait) ; les mises à jour nocturnes restent couvertes
+  côté auth via 100251 (_apt).
 -->
 <group name="docker,sentinel,">
 
@@ -22,12 +28,12 @@
   </rule>
 
   <!--
-    Attrape le démarrage d'un conteneur dont le dernier segment d'image n'est pas dans la liste connue.
-    Un déploiement qui tire une image nouvelle (tag ou dépôt) peut déclencher à tort — exclusion compose fortyk ci-dessous.
+    Attrape le démarrage d'un conteneur dont le dernier segment d'image n'est pas dans la liste connue du parc.
+    Un déploiement qui tire une image nouvelle (tag) peut déclencher à tort — exclusion compose fortyk ci-dessous.
   -->
   <rule id="100305" level="8">
     <if_sid>87903</if_sid>
-    <field name="docker.from" type="pcre2">^(?!(?:[^/]+/)*(?:caddy|postgres|postgis|cloudflared|scraper|wazuh|fortyk)(?::[^/\s]*)?$)</field>
+    <field name="docker.from" type="pcre2">^(?!(?:[^/]+/)*(?:caddy|postgres|postgis|cloudflared|scraper|wazuh|fortyk-(?:api|db|caddy|cloudflared|scraper))(?::[^/\s]*)?$)</field>
     <description>Docker (orange) : image inconnue démarrée</description>
   </rule>
 
