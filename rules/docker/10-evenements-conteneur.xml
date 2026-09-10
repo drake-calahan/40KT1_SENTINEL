@@ -5,7 +5,7 @@
   Images connues (phase 1, liste écrite) : dernier segment exact =
     caddy · postgres · postgis · cloudflared · scraper · wazuh · fortyk.
   Hors portée du flux docker events (pas d'attribut privileged / mounts / ports) :
-    conteneur --privileged, socket docker.sock monté, port publié sur 0.0.0.0 —
+    conteneur privileged, socket docker.sock monté, port publié sur 0.0.0.0 :
     voir DISCOVERY.md et TASKS#P01.17 (sonde d'inspection).
 -->
 <group name="docker,sentinel,">
