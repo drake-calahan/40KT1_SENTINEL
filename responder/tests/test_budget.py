@@ -1,5 +1,7 @@
 """Le budget : trois gestes par heure glissante, puis plus rien jusqu'à un humain."""
 
+import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from responder.config import Config
@@ -64,6 +66,41 @@ def test_le_mode_a_blanc_consomme_le_budget_comme_le_mode_arme(
     assert decision.resultat == "aurait_execute"
     assert quatrieme.refuse
     assert quatrieme.severite == "critique"
+    assert joues == []
+
+
+def test_le_gel_du_mode_a_blanc_est_collant_comme_celui_du_mode_arme(
+    config: Config, joues: list[Ordre]
+) -> None:
+    # `P03.10`. Le temoin `budget-gele` n'etait pose que sur le chemin ou le
+    # geste avait ete JOUE. En mode a blanc, le budget se voyait donc gele tant
+    # que les entrees restaient dans la fenetre glissante, puis se relachait
+    # tout seul — alors que le mode arme, lui, attend un degel humain. Le mode a
+    # blanc aurait prouve un budget plus permissif que celui qu'on veut armer.
+    executeur = Executeur(
+        avec(config, mode_a_blanc=True), gestes_cables={"bloquer_ip": joues.append}
+    )
+
+    for _ in range(3):
+        executeur.traiter(dict(ORDRE_VALIDE))
+
+    assert config.fichier_gel.exists()
+
+    # La fenetre glissante passe : on vieillit le journal d'une journee. Sans le
+    # temoin, le compte retomberait a zero et le budget se rouvrirait seul.
+    vieilli = datetime.now(UTC) - timedelta(days=1)
+    lignes = []
+    for ligne in config.journal.read_text(encoding="utf-8").splitlines():
+        entree = json.loads(ligne)
+        entree["horodatage"] = vieilli.isoformat()
+        lignes.append(json.dumps(entree, ensure_ascii=False, sort_keys=True))
+    config.journal.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+
+    apres = executeur.traiter(dict(ORDRE_VALIDE))
+
+    assert apres.refuse
+    assert apres.severite == "critique"
+    assert "budget gelé" in apres.motif
     assert joues == []
 
 

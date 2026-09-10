@@ -124,7 +124,17 @@ class Executeur:
         severite = "rouge" if etat_budget is EtatBudget.DERNIER else "orange"
         empeche = self._ce_qui_empeche_d_agir(ordre)
         if empeche is not None:
-            return self._journaliser_ordre(ordre, mode, "aurait_execute", empeche, severite)
+            decision = self._journaliser_ordre(ordre, mode, "aurait_execute", empeche, severite)
+            # Le gel se pose ICI aussi, et pas seulement sur le chemin du geste
+            # joué. `aurait_execute` consomme le budget (`journal.RESULTATS_
+            # CONSOMMATEURS`) : sans ce témoin, le gel du mode à blanc se
+            # relâchait tout seul en sortant de la fenêtre glissante, là où le
+            # mode armé attend un dégel humain. Le mode à blanc aurait alors
+            # prouvé un budget plus permissif que celui qu'on veut armer —
+            # exactement ce que la promesse en tête de module interdit. `P03.10`.
+            if etat_budget is EtatBudget.DERNIER:
+                self.budget.geler("dernier geste du budget horaire consommé (geste non joué)")
+            return decision
 
         # Le geste est joué ICI, et son échec est un RÉSULTAT, pas une exception
         # qui remonte. Laisser l'erreur s'échapper laisserait l'ordre sans aucune

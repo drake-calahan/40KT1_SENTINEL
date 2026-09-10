@@ -16,11 +16,10 @@ Deux semaines pendant lesquelles l'exécuteur **décide et journalise** ce qu'il
 aurait fait, **sans exécuter** le geste. Le catalogue, le mode tournoi et le
 frein de désarmement se comportent comme en mode armé. Le **budget compte**
 les `aurait_execute` dans la fenêtre glissante (un 4ᵉ ordre de l'heure est
-refusé) — **mais le témoin `budget-gele` n'est pas posé** en mode à blanc
-aujourd'hui : `geler()` n'est appelé que sur les chemins où le geste a été
-*joué*. Conséquence : en à blanc, le gel se **relâche tout seul** quand la
-fenêtre glisse ; le `degel` humain n'est pas exercé. Suite code :
-`P03.10` (claude).
+refusé) **et pose le témoin `budget-gele`** comme en mode armé : le gel ne se
+relâche pas quand la fenêtre glisse, il attend un `degel` humain. Corrigé par
+`P03.10` (2026-09-10) — avant quoi le mode à blanc aurait prouvé un budget plus
+permissif que celui qu'on veut armer.
 
 Critère de sortie de la phase 3 (extrait) : *zéro geste à blanc jugé
 injustifié sur la période*. Ce runbook rend ce jugement possible **sans relire
@@ -173,10 +172,11 @@ Avant d'ouvrir l'étape d'armement (`P03.4`) :
    ([`desarmement-d-urgence.md`](desarmement-d-urgence.md) / `P03.3`).
 4. Preuve d'alerte sur les deux canaux déjà faite (`P02.0`) — sinon on armerait
    sans destinataire.
-5. **Gel + `degel` humain exercés** — aujourd'hui **impossible en mode à blanc**
-   (`P03.10`) : le témoin `budget-gele` n'est pas posé sur `aurait_execute`.
-   Ne pas valider cet invariant sur la seule période à blanc tant que `P03.10`
-   n'est pas livré ; l'exercer en armement contrôlé ou après le correctif.
+5. **Gel + `degel` humain exercés** — exerçables en mode à blanc depuis
+   `P03.10` (2026-09-10) : le témoin `budget-gele` est posé sur
+   `aurait_execute` comme sur `execute`. Le gel attend donc un humain des deux
+   côtés, et c'est bien le `degel` de la période à blanc qui compte comme
+   preuve.
 
 ## Format d'une ligne de journal (référence)
 
