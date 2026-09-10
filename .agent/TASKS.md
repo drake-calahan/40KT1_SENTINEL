@@ -335,20 +335,26 @@ partie, toujours.**
       vise désormais `/etc/logrotate.d/` · `100150` couvre les artefacts `ucf`.
       Les motifs d'exclusion trop larges (`.tmp`, `.cache`) ont été resserrés
       sur les artefacts réels.
-- [~] **P01.1** (cursor, 2026-09-09) Rôle `sentinel_agent` — agents sur
+- [x] **P01.1** (cursor, 2026-09-09) Rôle `sentinel_agent` — agents sur
       `patator-tower` et `patator-standby`, enrôlement par clé, aucun redémarrage
       de service de production déclenché par le rôle —
-      [brief](briefs/P01.1-role-sentinel-agent.md). Inclut les suites `P01.11` et
-      `P01.12` (alignement `sentinel_fim_realtime_paths`).
-- [~] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
-      [brief](briefs/P01.8-regles-auth-docker.md).
-      *Revue PR #17 (2026-09-10) : retiré privileged / socket / port `0.0.0.0`
-      du lot — hors flux `docker events` ; manque consignés → `P01.17`.*
-- [ ] **P01.17** (cursor) Sonde d'inspection Docker (lecture seule) : détecter
-      conteneur `--privileged`, montage de `docker.sock`, port publié sur
-      `0.0.0.0` — cas que `docker events` / `P01.8` ne voient pas
-      ([`DISCOVERY.md`](DISCOVERY.md) § réseau). Unité `sentinel-*` désarmée ;
+      [brief](briefs/P01.1-role-sentinel-agent.md). **Fusionné PR #13** ; CI verte.
+      Pose désarmée ; `--check --diff` réel sur machine = geste d'exploitation
+      (empreinte clé + `.env`), hors cochage de ce lot code. Suites `P01.11` /
+      `P01.12` : PR #18.
+- [x] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
+      [brief](briefs/P01.8-regles-auth-docker.md). **Fusionné PR #17** (2026-09-10).
+      *Revue : retiré privileged / socket / port `0.0.0.0` du lot — hors flux
+      `docker events` ; manque consignés → `P01.17`.*
+- [x] **P01.17** (cursor, 2026-09-10) Sonde d'inspection Docker (lecture seule) :
+      détecter conteneur `--privileged`, montage de `docker.sock`, port publié
+      sur `0.0.0.0` — cas que `docker events` / `P01.8` ne voient pas
+      ([`DISCOVERY.md`](DISCOVERY.md) § réseau ;
+      [brief](briefs/P01.17-sonde-inspection-docker.md)). Unités
+      `sentinel-inspection-docker.{service,timer}` livrées désarmées ;
       `ok` / `ko` / `unknown`. Hors périmètre : configurer le démon (HQ).
+      **Limite** : enable du timer + lecture sur parc réel = geste
+      d'exploitation, hors cochage de ce lot code.
 - [ ] **P01.3** (claude) Règle **anti-rafale** pour la perte de contact d'un
       agent. **Le noyau est livré** (`bruit/`, voir `P02.2`) et le cas du standby
       est rejoué en test : 6 h de panne sondée à la minute → **25 alertes au lieu
