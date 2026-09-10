@@ -122,19 +122,49 @@
     mode: "0755"
   become: true
 
+# Sur un hôte VIERGE en `--check`, la déclaration du dépôt n'a pas écrit son
+# fichier : `apt` ne connaît donc pas encore `wazuh-agent`, et le module
+# échouait avec « No package matching 'wazuh-agent' is available ». Le premier
+# `--check` — celui que le dépôt impose avant tout apply — ne rendait donc pas
+# son verdict. Même parade que dans `sentinel_server` (`P01.20`), et posée des
+# deux côtés le même jour pour que les rôles jumeaux ne divergent pas.
+- name: Relever si le dépôt du moteur est déjà déclaré sur la machine
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/sentinel-wazuh.list
+  become: true
+  register: sentinel_agent_depot_present
+  changed_when: false
+
 - name: Installer l'agent, à la version épinglée
   ansible.builtin.apt:
     name: "{{ sentinel_agent_paquet }}={{ sentinel_server_wazuh_version }}-*"
     state: present
     update_cache: true
   become: true
+  when: not ansible_check_mode or sentinel_agent_depot_present.stat.exists
   notify: redemarrer l agent
+
+- name: Signaler que l'installation n'a pas pu être simulée — attendu en `--check`
+  ansible.builtin.set_fact:
+    sentinel_agent_points_signales: >-
+      {{ sentinel_agent_points_signales + [
+           "Installation de " ~ sentinel_agent_paquet ~ " NON SIMULÉE : le "
+           ~ "dépôt de paquets n'est pas encore déclaré sur cette machine, "
+           ~ "donc apt ne connaît pas le paquet. Ce --check ne prouve donc PAS "
+           ~ "que la version " ~ sentinel_server_wazuh_version ~ " est servie "
+           ~ "par le dépôt. Rejouer un --check APRÈS le premier apply le "
+           ~ "prouvera."
+         ] }}
+  when:
+    - ansible_check_mode
+    - not sentinel_agent_depot_present.stat.exists
 
 - name: Geler la version contre les mises à jour automatiques
   ansible.builtin.dpkg_selections:
     name: "{{ sentinel_agent_paquet }}"
     selection: hold
   become: true
+  when: not ansible_check_mode or sentinel_agent_depot_present.stat.exists
 
 - name: Lever l'interdiction de démarrage
   ansible.builtin.file:

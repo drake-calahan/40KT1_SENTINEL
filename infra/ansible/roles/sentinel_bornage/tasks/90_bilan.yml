@@ -14,7 +14,7 @@
   ansible.builtin.command:
     cmd: >-
       systemctl show {{ sentinel_bornage_unite }}
-      -p MemoryHigh -p MemoryMax -p CPUQuotaPerSecUSec
+      -p LoadState -p MemoryHigh -p MemoryMax -p CPUQuotaPerSecUSec
   become: true
   register: sentinel_bornage_mesure
   changed_when: false
@@ -22,6 +22,39 @@
   # En `--check`, le drop-in n'a pas été posé : la mesure n'aurait aucun sens.
   # On ne la simule pas, on l'annonce non prise.
   when: not ansible_check_mode
+
+# `systemctl show` rend rc=0 et `MemoryMax=infinity` pour une unité qu'il ne
+# connaît PAS — et au premier apply il ne la connaît pas : `sentinel_bornage`
+# passe avant `sentinel_server`, donc avant l'installation du moteur. Le
+# contrôle ci-dessous prenait ce silence pour un plafond non appliqué et
+# arrêtait le tout premier apply du serveur central. Mesuré en répétition à
+# blanc, 2026-09-10 (`P01.20`).
+#
+# Une unité absente n'est ni `ok` ni `ko` : elle est NON MESURÉE (`RULES` § 1).
+# Ça se signale, et ça se remesure au passage suivant — celui d'après
+# l'installation du moteur.
+- name: Établir si l'unité à borner est connue de systemd
+  ansible.builtin.set_fact:
+    sentinel_bornage_unite_connue: >-
+      {{ (sentinel_bornage_mesure.stdout | default(''))
+         is search('LoadState=loaded') }}
+
+- name: Signaler un plafond posé sur une unité qui n'existe pas encore
+  ansible.builtin.set_fact:
+    sentinel_bornage_points_signales: >-
+      {{ sentinel_bornage_points_signales + [
+           "Plafond POSÉ mais NON MESURÉ : systemd ne connaît pas encore "
+           ~ sentinel_bornage_unite ~ " (le moteur n'est pas installé ; ce rôle "
+           ~ "passe avant celui qui l'installe). Le drop-in est bien écrit et "
+           ~ "systemd le rattachera à l'unité dès qu'elle existera. La "
+           ~ "condition 1 d'ADR-003 n'est donc PAS vérifiée par ce passage : "
+           ~ "rejouer le playbook après l'installation du moteur, ou mesurer à "
+           ~ "la main par « systemctl show " ~ sentinel_bornage_unite
+           ~ " -p MemoryMax »."
+         ] }}
+  when:
+    - not ansible_check_mode
+    - not sentinel_bornage_unite_connue | bool
 
 - name: Bilan du bornage sur cet hôte
   ansible.builtin.debug:
@@ -33,6 +66,13 @@
         MemoryMax={{ sentinel_bornage_memory_max }}
         CPUQuota={{ sentinel_bornage_cpu_quota }}
       - "plafond APPLIQUÉ    : {{ sentinel_bornage_mesure.stdout_lines | default(['NON MESURÉ (--check)']) | join(' · ') }}"
+      # Guillemets DOUBLES dans la chaîne Jinja : « n'est » couperait une
+      # chaîne simple-quotée, et la tâche ne se chargerait même pas
+      # (DISCOVERY.md § apostrophe — piège déjà payé, repayé ici).
+      - >-
+        unité connue        : {{ 'oui' if (sentinel_bornage_unite_connue | default(false) | bool)
+        else ("non — plafond NON MESURABLE tant que le moteur n'est pas installé"
+        if not ansible_check_mode else 'non mesuré (--check)') }}
       - "interlock (cond. 2) : {{ 'ARMÉ' if sentinel_bornage_interlock_enabled | bool else 'posé, DÉSARMÉ (défaut du dépôt)' }}"
       - "état relève lu dans : {{ hq_failover_state_file }}{{ '' if hq_failover_state_confirme | bool else '  ⚠️ CHEMIN NON CONFIRMÉ' }}"
       - "sur état inconnu    : {{ sentinel_bornage_interlock_sur_inconnu }}"
@@ -57,6 +97,7 @@
   when:
     - not ansible_check_mode
     - sentinel_bornage_mesure.rc | default(1) == 0
+    - sentinel_bornage_unite_connue | bool
 
 - name: Points signalés et NON joués — à reprendre par un humain
   ansible.builtin.debug:
