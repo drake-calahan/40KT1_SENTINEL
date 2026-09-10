@@ -282,6 +282,44 @@
   become: true
   notify: redemarrer le serveur central
 
+# ── Le contrôle qui évite un démarrage impossible à diagnostiquer ─────────
+# `wazuh-control` ne lit pas le XML : il cherche les balises `auth` et `cluster`
+# par un `grep -n`, prend le numéro de ligne pour délimiter le bloc, et passe le
+# tout à `sed`. Une SECONDE occurrence de la balise — dans un commentaire, par
+# exemple — lui donne deux numéros, son `sed` échoue, il attend soixante
+# secondes puis déclare « wazuh-authd did not start correctly » : l'unité
+# ENTIÈRE refuse de démarrer, pour un commentaire. Mesuré 4.14.7 en répétition
+# à blanc, et le message d'erreur ne dit rien de la vraie cause.
+- name: Relever les balises que `wazuh-control` compte dans la configuration
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      grep -c '<auth>\|</auth>\|<cluster>\|</cluster>' {{ sentinel_server_ossec_conf }}
+      || true
+    executable: /bin/bash
+  become: true
+  register: sentinel_server_balises_comptees
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Aucune balise `auth` ou `cluster` en double dans la configuration
+  ansible.builtin.assert:
+    that:
+      - (sentinel_server_balises_comptees.stdout | default('0') | trim | int) <= 2
+    fail_msg: >-
+      La configuration rendue contient plus de deux occurrences des balises que
+      `wazuh-control` compte (auth / cluster) :
+      {{ sentinel_server_balises_comptees.stdout | default('?') | trim }}
+      trouvées. Presque toujours un COMMENTAIRE qui cite la balise. Conséquence :
+      le moteur refuse de démarrer avec « wazuh-authd did not start correctly »,
+      soixante secondes plus tard, sans dire pourquoi. Retirer les chevrons du
+      commentaire dans templates/ossec.conf.j2 — le nom de la balise en toutes
+      lettres suffit à se faire comprendre.
+    success_msg: "balises auth/cluster : une paire, comme il faut"
+    quiet: true
+  when: not ansible_check_mode
+
 - name: Rendre la configuration de l'API — écoute sur le tailnet seul
   ansible.builtin.template:
     src: api.yaml.j2

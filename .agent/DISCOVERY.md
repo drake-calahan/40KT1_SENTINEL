@@ -259,6 +259,84 @@ sémantique Ansible.
 **Implication** : lot `P00.11`. En attendant, le gabarit impose `false` littéral
 dans `defaults/` — et la garde CI reste la ceinture, pas les bretelles.
 
+## Répétition à blanc du premier déploiement (`P01.20`, 2026-09-10)
+
+> Méthode : un conteneur Debian 12 avec `systemd` en PID 1, une interface
+> `tailscale0` factice adressée, un `.env` de test, et l'inventaire de
+> production joué avec `--limit patator-standby -e ansible_connection=local`.
+> Le conteneur joue l'hôte vierge ; **aucune machine du parc n'a été touchée**.
+> Ce qui suit n'aurait pas pu être trouvé en relisant le code : les quatre
+> défauts ci-dessous sont tous des comportements de `--check`.
+
+### Le premier `--check` échouait à trois endroits
+
+Le dépôt IMPOSE `--check --diff` avant tout `apply` (`RULES` § 2). Sur un hôte
+vierge — c'est-à-dire au seul moment où on en a vraiment besoin — il s'arrêtait :
+
+1. **`sentinel_bornage`** : `systemd_service` sur une unité que `--check` n'a que
+   simulée → « Could not find the requested service ». Et comme ce rôle passe
+   **avant** `sentinel_server` dans `01_server.yml`, il arrêtait tout le
+   playbook. Même défaut que `P01.15` sur les deux autres rôles, troisième rôle
+   oublié.
+2. **`sentinel_server` et `sentinel_agent`** : `apt` ne connaît pas
+   `wazuh-manager` / `wazuh-agent` tant que le dépôt n'est pas *réellement*
+   déclaré → « No package matching … is available ». Un `--check` sur hôte
+   vierge ne peut pas simuler l'installation d'un paquet venu d'un dépôt qu'il
+   n'a pas posé : on le **signale** au bilan plutôt que d'échouer.
+3. **`00_check.yml`** : `ansible.builtin.command` est **sauté** en `--check`, et
+   l'affirmation qui suivait lisait le résultat d'une tâche sautée — le
+   playbook de contrôle annonçait « l'élévation échoue (rc=?) » sur une machine
+   où elle marche. `check_mode: false` sur une commande qui ne fait que lire.
+
+### `service_facts` ne liste pas les `.timer`
+
+Corollaire trouvé à l'`apply`, pas au `--check` : après une pose réussie et un
+`daemon-reload`, `sentinel-interlock-releve.timer` restait absent de
+`ansible_facts.services`. Le module ne rend que les unités de type `service`.
+Une garde bâtie dessus refuse une unité pourtant bien posée. Pour des unités
+**que le rôle écrit lui-même**, regarder le fichier là où on vient de l'écrire
+(`stat` sur `/etc/systemd/system/<unité>`) est plus simple et plus vrai.
+
+### Sans bloc `<ruleset>`, le moteur ignore `etc/rules`
+
+*Mesuré `wazuh-manager:4.14.7`.* Un `ossec.conf` sans `<ruleset>` charge quand
+même le jeu **de base** de l'éditeur — mais pas `etc/rules`, donc aucune règle
+Sentinelle. Un événement de perte de contact retombait sur la règle de base
+`504` au lieu de `100501`. Le manager tourne, journalise, et n'applique aucune
+des trente-huit règles du dépôt : pas d'erreur, seulement du silence. Le bloc
+doit **reprendre le jeu par défaut avant d'ajouter le nôtre** — le déclarer seul
+remplace au lieu d'étendre, et on perd les listes CDB.
+
+### Un commentaire qui cite une balise empêche le moteur de démarrer
+
+*Le plus coûteux des cinq, et le moins devinable.* `wazuh-control` ne lit pas le
+XML : pour savoir s'il doit démarrer `wazuh-authd` (idem `wazuh-clusterd`), il
+cherche la balise ouvrante et la fermante par un `grep -n`, prend les numéros de
+ligne, et passe le tout à `sed -n "début,finp"`. Une **seconde occurrence** de la
+balise — dans un commentaire, par exemple, où l'on explique justement pourquoi on
+désactive le démon — lui rend deux numéros. Son `sed` échoue
+(`unknown command`), il attend **soixante secondes**, puis déclare
+« wazuh-authd did not start correctly » : **l'unité entière refuse de
+démarrer**, et le message ne dit rien de la vraie cause.
+
+Règle pratique : dans `ossec.conf`, un commentaire nomme une balise **en toutes
+lettres, sans chevrons**. Le rôle `sentinel_server` compte désormais ces balises
+après le rendu et refuse d'aller plus loin s'il en trouve en double.
+
+### Premier démarrage d'un agent : règle `501`, pas `503`
+
+La **première** fois qu'un agent démarre, le manager rend `501` (« New wazuh
+agent connected », `<if_fts/>`), et `503` seulement ensuite. Une règle locale
+branchée sur `503` seul rate donc exactement la mise en service — le seul
+démarrage qu'on regarde vraiment. `<if_sid>501,503</if_sid>`.
+
+### Le décodeur `ossec` n'extrait aucun champ nommé
+
+Les événements d'état d'agent ne rendent que le `log` complet : ni `agent.name`,
+ni `extra_data`. Filtrer sur un nœud précis passe par un `<match>` sur le texte
+(`Agent disconnected: 'nom->`), et pas autrement. L'ancrage sur le séparateur
+`->` évite qu'un `patator-standby-2` soit confondu avec `patator-standby`.
+
 ## L'exécuteur — trois pièges relevés en câblant les gestes (`P03.6`)
 
 ### `is_private` de Python ne protège pas le tailnet de façon stable

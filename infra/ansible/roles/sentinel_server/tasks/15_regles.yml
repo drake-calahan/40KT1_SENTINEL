@@ -2,7 +2,7 @@
 # Pose des règles de détection Sentinelle sur le serveur central.
 #
 # ── POURQUOI CE FICHIER EXISTE ─────────────────────────────────────────────
-# `rules/` porte vingt-trois règles écrites par trois lots (`P01.2`, `P01.8`,
+# `rules/` porte trente-huit règles (huit fichiers) écrites par trois lots (`P01.2`, `P01.8`,
 # `P01.3`) — et jusqu'ici RIEN ne les posait sur la machine. Un serveur central
 # installé sans elles tourne, journalise, et n'applique aucune détection du
 # dépôt : il ne produit pas d'erreur, seulement du silence. C'est le faux vert

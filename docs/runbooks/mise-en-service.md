@@ -1,13 +1,13 @@
 # Mise en service — observation seule
 
-> ⚠️ **PAS ENCORE JOUABLE.** Ce runbook décrit une intention, pas un geste
-> disponible. Il devient jouable quand
-> [`ADR-003`](../adr/ADR-003-hote-du-serveur-central.md) est **acceptée** et que
-> les rôles `sentinel_server` et `sentinel_agent` existent (`P01.0`, `P01.1`).
+> ✅ **JOUABLE depuis le 2026-09-10** — `ADR-003` est *Acceptée*, les trois
+> rôles existent, et les trois playbooks ont été **répétés à blanc de bout en
+> bout** sur un hôte vierge (conteneur Debian 12 `systemd`, `--check --diff`
+> puis `apply`, aucune machine du parc touchée — `P01.20`). Cette répétition a
+> trouvé cinq défauts qui n'apparaissaient qu'à l'exécution ; ils sont corrigés.
 >
-> Il est écrit maintenant pour que la discussion porte sur des gestes, pas sur
-> des principes — et parce qu'un runbook rédigé après coup ne dit jamais
-> pourquoi.
+> **Ce qui reste à faire est un geste d'exploitation, et il appartient au PO.**
+> Ce runbook ne s'auto-exécute pas : il se lit, puis il se joue, dans l'ordre.
 
 ## Ce que cette procédure met en service
 
@@ -15,15 +15,40 @@ Le serveur central en **profil frugal** et les agents sur les deux nœuds Linux,
 en **observation seule** : aucune alerte poussée, aucune réponse. On mesure le
 bruit de fond.
 
-## Avant de commencer — trois vérifications
+## Avant de commencer — quatre vérifications
 
-1. **`ADR-003` est acceptée** et l'hôte du serveur central est nommé.
+1. **`ADR-003` est acceptée** et l'hôte du serveur central est nommé. ✅ fait.
    Sans cela, on installe au mauvais endroit et on ré-enrôle tout plus tard.
 2. **Le tailnet est sain entre l'hôte central et les deux nœuds.**
    `patator-standby` a un défaut IPv4 récidivant : vérifier `IP4.ADDRESS`, pas
    seulement la route. Voir [`.agent/DISCOVERY.md`](../../.agent/DISCOVERY.md).
-3. **Le `.env` de chaque nœud est posé**, à partir de `.env.example`, avec
+   Le rôle refuse de poser si `tailscale0` n'a pas d'adresse — c'est voulu.
+3. **Le `.env` de chaque nœud est posé** (`/opt/sentinel/.env`, mode `0600`,
+   propriétaire `root`), à partir de `.env.example`, avec
    `SENTINEL_RESPONSE_ENABLED=false` — c'est le défaut, ne pas le changer ici.
+   Deux variables sont **bloquantes**, et le contrôle s'arrête sans elles :
+
+   | Variable | Où elle sert | Ce que sa présence évite |
+   |---|---|---|
+   | `SENTINEL_ENROLL_KEY` | serveur **et** agents | un serveur qui accepte des agents sans les authentifier — ou aucun |
+   | `SENTINEL_SERVER_HOST` | agents | une IP publique en dur là où seul le MagicDNS du tailnet a le droit d'être |
+
+   La valeur ne passe **ni** par le dépôt, **ni** par l'inventaire, **ni** par
+   un `-e`. Elle est générée sur la machine, jamais recopiée d'ailleurs.
+4. **L'élévation de privilège fonctionne** sur les deux nœuds. `sudo-rs` casse
+   `become` avec un message qui ressemble à un problème de réseau : le
+   contournement (`ansible_become_exe: /usr/bin/sudo.ws`) est déjà dans
+   l'inventaire, et `00_check.yml` vérifie qu'il tient encore.
+
+## Étape 0 — le contrôle de terrain, en lecture seule
+
+```bash
+ansible-playbook -i inventory/production.yml playbooks/00_check.yml --check --diff
+```
+
+Il ne pose rien. Il dit qui répond, si l'élévation marche, où est la stack HQ,
+et ce qu'il **n'a pas pu mesurer** — un nœud injoignable ressort `INCONNU`, pas
+`ok`. Un `patator-tower` non joint n'est pas un feu vert pour la suite.
 
 ## 1. Le serveur central
 
@@ -37,9 +62,63 @@ Relire le diff **avant** de retirer `--check`. Points à contrôler dans le diff
 - le bornage `cgroup` est présent si l'hôte est `patator-standby` ;
 - aucun service de production n'est redémarré.
 
+**Lire aussi le bilan, pas seulement le diff.** Sur un hôte vierge, ce premier
+`--check` rend `ok` en signalant **six points « SIGNALÉ, NON JOUÉ »** — c'est le
+comportement correct, pas un défaut :
+
+| Ce qui est signalé | Pourquoi c'est normal ici |
+|---|---|
+| unités de l'interlock absentes | `--check` ne les a que simulées |
+| plafond `cgroup` non mesuré | rien n'est appliqué en `--check` |
+| chemin de l'état de la relève non confirmé | `P01.13`, arbitrage PO en attente |
+| installation du moteur non simulée | `apt` ne connaît pas un dépôt qu'il n'a pas encore |
+| unité `wazuh-manager` absente | le paquet n'est pas posé |
+| règles non posées, chargement non prouvé | `/var/ossec/etc/rules` n'existe pas encore |
+
+Un `--check` **sans** ces signalements sur un hôte vierge voudrait dire que le
+contrôle a menti. C'est le sens de la ligne « ce `--check` ne prouve donc PAS
+que… » qui accompagne chacun.
+
 Puis, **sur ordre PO explicite**, sans `--check`.
 
-## 2. Les agents, un nœud à la fois
+⚠️ **Le premier `apply` laisse deux choses non prouvées, par construction :**
+le plafond `cgroup` (le rôle qui le pose passe **avant** celui qui installe le
+moteur, donc systemd ne connaît pas encore l'unité à borner) et la version
+réellement servie par le dépôt. **Rejouer le playbook une seconde fois** les
+mesure toutes les deux — la deuxième passe doit être `changed=0` sur la pose et
+verte sur les deux contrôles. Un déploiement se fait en deux passages, et la
+seconde n'est pas une reprise : c'est la mesure.
+
+### Ce qu'un `apply` laisse « changed » à chaque passage
+
+Cinq tâches ressortent `changed` même sur une machine déjà conforme, et ce
+n'est pas une dérive : le répertoire temporaire de la clé du dépôt (créé, rempli,
+retiré) et le fichier `policy-rc.d` (posé le temps de l'installation, retiré
+juste après). Les compter comme du bruit est correct ; les voir disparaître
+serait le vrai signal d'alarme, puisque c'est la parade qui empêche le paquet de
+démarrer son service tout seul.
+
+## 2. La fenêtre d'enrôlement — à ouvrir, puis à refermer
+
+⚠️ **Le démon d'enrôlement est FERMÉ par défaut, et il doit le rester hors mise
+en service.** Motif mesuré (`P01.21`) : `wazuh-authd` écoute sur `0.0.0.0`, et
+Wazuh n'offre **aucune** option pour le lier à une interface — `<auth>` n'a pas
+l'équivalent du `local_ip` de `<remote>`. Ouvert en permanence, le port
+d'inscription et le secret qui le protège seraient joignables depuis le LAN, ce
+que `C4` interdit. Le contrôle d'écoute de l'armement refuse d'ailleurs cet
+état, et il a raison.
+
+L'enrôlement est donc une **fenêtre**, pas un réglage :
+
+```bash
+ansible-playbook -i inventory/production.yml playbooks/01_server.yml   -e '{"sentinel_server_enabled": true, "sentinel_server_authd_ouvert": true}'
+```
+
+… puis on inscrit les agents (§ 3), **puis on referme** en rejouant la même
+commande **sans** `sentinel_server_authd_ouvert`. Tant que la fenêtre est
+ouverte, le playbook le signale à chaque passage, et l'armement le refuse.
+
+## 3. Les agents, un nœud à la fois
 
 ```bash
 ansible-playbook -i inventory/production.yml playbooks/02_agent.yml --limit patator-tower --check --diff
@@ -49,22 +128,42 @@ ansible-playbook -i inventory/production.yml playbooks/02_agent.yml --limit pata
 quoi que ce soit, on veut le découvrir sur la machine qu'on regarde, pas sur les
 deux en même temps.
 
-## 3. Vérifier que les agents sont vus — et qu'ils mesurent
+⚠️ **`patator-standby` ne reçoit PAS d'agent**, et ce n'est pas un oubli :
+`wazuh-agent` et `wazuh-manager` se déclarent en conflit au niveau du paquet —
+`apt` refuse d'installer les deux. Le nœud n'est pas aveugle pour autant : le
+manager se surveille lui-même (agent local `000`), avec **les mêmes listes
+d'intégrité** que les agents. Le playbook exclut cet hôte de lui-même
+(`sentinel_agents_linux:!sentinel_server`) et le rôle refuse de s'y exécuter si
+un `--limit` l'y amenait quand même.
+
+## 4. Vérifier que les agents sont vus — et qu'ils mesurent
 
 Deux contrôles, pas un. Le premier dit que l'agent est connecté ; le second dit
 qu'il **regarde**. Un agent connecté qui ne remonte rien est un faux vert, et
 c'est le mode de panne le plus dangereux d'une supervision.
 
-## 4. Poser la règle anti-rafale — maintenant, pas après
+## 5. Poser la règle anti-rafale — déjà écrite, à vérifier
 
 `patator-standby` perd son IPv4 régulièrement (quatre occurrences en trois
 semaines). Sans règle d'agrégation, la première coupure produit une rafale
 d'alertes de perte de contact, et la réaction naturelle est de couper le bruit —
 donc de perdre le signal.
 
-La règle s'écrit **avant** la mise sous tension. Voir `P01.3`.
+La règle s'écrit **avant** la mise sous tension : c'est fait
+([`rules/agents/10-contact-agent.xml`](../../rules/agents/10-contact-agent.xml),
+`P01.3`), et elle est posée sur le manager par le rôle lui-même (`P01.19`).
+Après le premier `apply`, vérifier sur la machine que le moteur la voit :
 
-## 5. Laisser tourner, et compter
+```bash
+sudo /var/ossec/bin/wazuh-analysisd -t
+sudo ls /var/ossec/etc/rules/sentinel-*.xml
+```
+
+Le premier doit sortir sans erreur ; le second doit lister les cinq familles.
+Un manager sans ces fichiers tourne et ne détecte **rien** de ce que le dépôt
+décrit — sans produire la moindre erreur.
+
+## 6. Laisser tourner, et compter
 
 Période d'observation : **14 jours** par défaut (`D5`), couvrant au moins un
 déploiement complet et une sauvegarde offsite.

@@ -75,9 +75,33 @@ machine ni d'un arbitrage :
   d'observation : le `degel` humain s'exerce désormais **pendant** les quatorze
   jours, et non « en armement contrôlé, plus tard ».
 
-Ce qui part maintenant : `claude` prend `P01.3` (règle anti-rafale — un agent
-existe enfin) · **porter le jumeau du contrat dans HQ** (`P00.5`, dernière
-moitié — dépôt tiers).
+**2026-09-10, seconde partie — la mise en service est devenue jouable.**
+`claude` a livré `P01.3` (règles `rules/agents/`, anti-rafale du standby
+mesurée sur `wazuh-manager:4.14.7`), puis **a joué le déploiement pour de vrai**
+sur un hôte de laboratoire — un conteneur Debian 12 `systemd` avec une
+`tailscale0` factice, l'inventaire de production en local (`P01.20`). **Aucune
+machine du parc n'a été touchée.**
+
+Ce que la répétition a trouvé, et qu'aucune relecture n'aurait donné :
+
+- **Le premier `--check` échouait à trois endroits** et le premier `apply` à
+  deux de plus. Le geste que le dépôt IMPOSE avant tout `apply` ne rendait donc
+  jamais son verdict la première fois. Les cinq sont corrigés ; les trois
+  playbooks vont maintenant au bout sur un hôte vierge.
+- **Les trente-huit règles du dépôt (huit fichiers) n'étaient posées sur
+  aucune machine**, et le `ossec.conf` rendu n'avait pas de bloc `<ruleset>` — sans lequel le moteur
+  **ignore** `etc/rules`. Un serveur installé ainsi tourne, journalise, et ne
+  détecte rien de ce que le dépôt décrit, sans la moindre erreur (`P01.19`).
+- **Deux impossibilités du plan** (`P01.21`) : un agent ne peut pas cohabiter
+  avec le manager (conflit de paquet déclaré) — le manager se surveille donc
+  lui-même ; et `wazuh-authd` écoute sur `0.0.0.0` sans option pour le
+  restreindre — l'enrôlement devient une **fenêtre** qu'on ouvre et qu'on
+  referme, plutôt qu'un port laissé ouvert sur le LAN contre `C4`.
+
+Ce qui part maintenant : **le premier déploiement réel** — geste PO, runbook
+[`mise-en-service.md`](../docs/runbooks/mise-en-service.md), désormais marqué
+*jouable*. Puis `P00.5` (jumeau du contrat dans HQ, dépôt tiers) et `P01.13`
+(arbitrage : que veut dire « la relève s'arme »).
 
 **2026-09-09 — quatre arbitrages rendus par le PO** (`A1`–`A3`, `B`). Ce qui en
 sort :

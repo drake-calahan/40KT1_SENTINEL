@@ -62,17 +62,25 @@
        silencieusement par un nouveau qui prétendrait le même nom. -->
   <auth>
     <!-- FERMÉ PAR DÉFAUT, et ce n'est pas de la prudence décorative : mesuré en
-         répétition à blanc (`P01.21`), `wazuh-authd` écoute sur **0.0.0.0**
-         et non sur l'adresse du tailnet. Wazuh n'offre aucune option pour lier
-         ce démon à une interface : `<auth>` n'a pas d'équivalent du `local_ip`
-         de `<remote>`. Laisser l'enrôlement ouvert exposerait donc le port
-         d'inscription — et le secret qui le protège — au LAN, ce que C4
-         interdit. Le contrôle d'écoute de `20_armement.yml` le refuse, à juste
-         titre.
-         L'enrôlement devient donc une FENÊTRE, ouverte par un humain, le temps
+         répétition à blanc (P01.21), wazuh-authd écoute sur **0.0.0.0** et non
+         sur l'adresse du tailnet. Wazuh n'offre aucune option pour lier ce
+         démon à une interface : la balise d'enrôlement n'a pas d'équivalent du
+         local_ip de la balise remote. Laisser l'enrôlement ouvert exposerait
+         donc le port d'inscription — et le secret qui le protège — au LAN, ce
+         que C4 interdit. Le contrôle d'écoute de 20_armement.yml le refuse, à
+         juste titre.
+
+         L'enrôlement est donc une FENÊTRE, ouverte par un humain le temps
          d'inscrire les agents, puis refermée :
            -e '{"sentinel_server_authd_ouvert": true}'
-         Voir docs/runbooks/mise-en-service.md § 2. -->
+         Voir docs/runbooks/mise-en-service.md § 2.
+
+         ⚠️ NE JAMAIS ÉCRIRE LA BALISE OUVRANTE OU FERMANTE D'ENRÔLEMENT DANS UN
+         COMMENTAIRE DE CE FICHIER. `wazuh-control` cherche ces balises par un
+         `grep -n` pour savoir s'il doit démarrer le démon ; une occurrence de
+         plus lui donne deux numéros de ligne, son `sed` échoue, il attend
+         60 s puis déclare « wazuh-authd did not start correctly » — et
+         L'UNITÉ ENTIÈRE échoue à démarrer. Mesuré 4.14.7, DISCOVERY.md. -->
     <disabled>{{ 'no' if sentinel_server_authd_ouvert | bool else 'yes' }}</disabled>
     <port>{{ sentinel_server_port_enrolement }}</port>
     <use_source_ip>no</use_source_ip>
