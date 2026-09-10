@@ -1,0 +1,87 @@
+<!--
+  P01.3 — Santé des agents : perte de contact, retour, retrait.
+  Plage 100500-100599 (rules/README.md).
+
+  Ce que ces règles attrapent : les événements que le SERVEUR CENTRAL émet
+  lui-même sur l'état de ses agents (`wazuh-monitord`), décodés par le décodeur
+  `ossec` et portés par les règles de base 503 (agent démarré), 504 (agent
+  déconnecté) et 505 (agent retiré). Vérifié `wazuh-manager:4.14.7` :
+  le décodeur n'extrait AUCUN champ nommé — ni `agent.name`, ni `extra_data` —
+  il ne rend que le `log` complet. Filtrer sur un nœud précis passe donc par un
+  `<match>` sur le texte `Agent disconnected: 'nom->`, et pas autrement.
+
+  Ce qui les ferait crier à tort : un redémarrage volontaire de l'agent pendant
+  un `apply` Ansible produit 504 puis 503. C'est assumé en observation seule —
+  la paire se lit, et c'est même la preuve que la sonde regarde. La rafale, elle,
+  est traitée ci-dessous.
+
+  ── Pourquoi le cas `patator-standby` a sa propre règle ────────────────────
+  Ce nœud a perdu son IPv4 QUATRE fois en trois semaines (28/08, 30/08, 05/09,
+  06/09), cause NetworkManager — DISCOVERY.md § patator-standby. Sans
+  agrégation, la première coupure produit une rafale d'alertes de perte de
+  contact, et la réaction naturelle est de couper le bruit : on perdrait alors
+  le signal, pas seulement le bruit. La règle s'écrit AVANT la mise sous
+  tension (runbook `mise-en-service.md` § 4), pas après le premier week-end.
+
+  ── Ce que `<ignore>` fait, et ce qu'il ne fait pas ────────────────────────
+  `<ignore>900</ignore>` tient la fenêtre de 15 minutes de `F3` : une seule
+  alerte par quart d'heure pour ce nœud, quelle que soit la cadence des
+  événements. Il ne porte PAS le compteur (« 143 observations depuis
+  l'ouverture ») que `F3` demande aussi : le moteur `bruit/` le porte, et son
+  câblage vers Discord et ntfy est le lot `P02.0`. On écrit ici ce qui tient
+  dans le moteur de détection ; ce qui tient dans le canal d'alerte s'écrit là.
+-->
+<group name="agents,sentinel,">
+
+  <!--
+    Attrape la perte de contact avec n'importe quel agent Sentinelle.
+    Orange : un agent muet n'est pas une intrusion, mais c'est un trou de mesure —
+    et un trou de mesure est exactement ce qu'une intrusion produirait.
+  -->
+  <rule id="100501" level="7">
+    <if_sid>504</if_sid>
+    <description>Agent (orange) : perte de contact avec un agent Sentinelle</description>
+  </rule>
+
+  <!--
+    Attrape la même perte de contact quand elle vient de patator-standby, et
+    l'agrège sur 15 minutes. Le nom est ancré sur le séparateur `->` du message
+    du manager : `Agent disconnected: 'patator-standby->any'`. Un agent nommé
+    `patator-standby-2` ne serait donc PAS confondu avec celui-ci.
+  -->
+  <rule id="100502" level="7">
+    <if_sid>100501</if_sid>
+    <match>Agent disconnected: 'patator-standby-></match>
+    <ignore>900</ignore>
+    <description>Agent (orange) : perte de contact patator-standby — agrégée 15 min (défaut IPv4 connu)</description>
+  </rule>
+
+  <!--
+    Attrape le retour de contact. Info, jamais plus : ce n'est pas un incident.
+    DEUX parents, et c'est une mesure, pas une précaution : la PREMIÈRE fois
+    qu'un agent démarre, la base ne rend pas 503 mais 501 (`<if_fts/>`, « New
+    wazuh agent connected »). Avec `<if_sid>503</if_sid>` seul, la mise en
+    service des deux nœuds — c'est-à-dire le premier démarrage de chaque agent,
+    le seul qu'on regardera vraiment — serait passée sous la règle de base sans
+    sévérité Sentinelle. Mesuré `wazuh-manager:4.14.7`.
+    Mais il se journalise, parce qu'une alerte sans clôture se relit mal au
+    repassage hebdomadaire de la période d'observation (D5) — elle finit classée
+    `indeterminee`, et une `indeterminee` de plus est une mesure de moins.
+  -->
+  <rule id="100503" level="3">
+    <if_sid>501,503</if_sid>
+    <description>Agent (info) : contact rétabli avec un agent Sentinelle</description>
+  </rule>
+
+  <!--
+    Attrape le RETRAIT d'un agent du serveur central. Ce n'est pas une panne :
+    c'est un geste, et personne n'est censé le faire pendant la phase 1. Rouge —
+    la règle de base 505 porte déjà MITRE T1562.001 (Impair Defenses), et
+    désactiver la supervision est le premier geste d'un attaquant qui s'installe.
+  -->
+  <rule id="100505" level="10">
+    <if_sid>505</if_sid>
+    <description>Agent (rouge) : agent retiré du serveur central — geste, pas panne</description>
+  </rule>
+
+</group>
