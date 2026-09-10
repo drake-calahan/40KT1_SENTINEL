@@ -413,7 +413,15 @@ partie, toujours.**
       vierge (`rc=0`). Détail dans `DISCOVERY.md` § répétition à blanc. Ce qui
       en sort et qui n'était pas dans le code : `service_facts` ne liste pas les
       `.timer` · `command` est sauté en `--check` · `systemctl show` rend
-      `MemoryMax=infinity` pour une unité qu'il ne connaît pas.
+      `MemoryMax=infinity` pour une unité qu'il ne connaît pas · **un
+      commentaire qui cite une balise que `wazuh-control` grep empêche l'unité
+      entière de démarrer**.
+      **Chaîne complète prouvée en bac à sable** : `00_check` → `--check` →
+      apply désarmé (unité `inactive`/`disabled`, huit fichiers de règles,
+      `analysisd -t` propre) → second passage (plafond mesuré) → armement
+      (`active`, **une seule socket**, `remoted` sur le tailnet). Reste non
+      prouvable ainsi : l'`apply` d'un agent avec enrôlement (deux machines),
+      et la durée réelle du premier démarrage.
 - [x] **P01.21** (claude, 2026-09-10) **Deux impossibilités du plan, trouvées en
       le jouant.** (a) L'inventaire prévoyait un agent sur `patator-standby`
       **et** le serveur central sur le même hôte — or `wazuh-agent` et

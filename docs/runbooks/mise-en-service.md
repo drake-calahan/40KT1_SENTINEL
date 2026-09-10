@@ -9,6 +9,32 @@
 > **Ce qui reste à faire est un geste d'exploitation, et il appartient au PO.**
 > Ce runbook ne s'auto-exécute pas : il se lit, puis il se joue, dans l'ordre.
 
+## Ce qui a été prouvé en répétition, et ce qui ne l'a pas été
+
+Sur un hôte de laboratoire vierge (conteneur Debian 12 `systemd`, `tailscale0`
+factice, inventaire de production joué en local — `P01.20`) :
+
+| Geste | Résultat |
+|---|---|
+| `00_check.yml --check --diff` | ✅ `rc=0` |
+| `01_server.yml --check --diff` sur hôte vierge | ✅ `rc=0`, six points signalés non joués |
+| `01_server.yml` apply, désarmé | ✅ `rc=0` — unité `inactive` **et** `disabled`, huit fichiers de règles posés, `wazuh-analysisd -t` propre |
+| second passage | ✅ plafond **mesuré** : `MemoryMax=1500M`, `CPUQuota=400ms` |
+| armement `-e '{"sentinel_server_enabled": true}'` | ✅ `rc=0` — unité `active`, **une seule socket** : `remoted` sur le tailnet |
+| `02_agent.yml --check --diff` | ✅ `rc=0` |
+
+**Ce qui n'est PAS prouvé** — et qu'aucun bac à sable ne prouvera :
+
+- l'`apply` réel d'un agent, l'enrôlement compris : il demande deux machines et
+  un manager joignable par le tailnet ;
+- la durée réelle du premier démarrage du moteur (entre 25 s et plus de 90 s
+  selon la charge en répétition ; le drop-in porte `TimeoutStartSec=300`, **à
+  confirmer sur la machine**) ;
+- tout ce qui dépend du parc : IPv4 du standby, `sudo-rs`, chemins de HQ.
+
+Un bac à sable dit qu'un playbook **peut** aller au bout. Il ne dit rien de la
+machine sur laquelle vous allez le jouer.
+
 ## Ce que cette procédure met en service
 
 Le serveur central en **profil frugal** et les agents sur les deux nœuds Linux,
