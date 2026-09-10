@@ -61,7 +61,19 @@
        `force` désactivé : un agent déjà enrôlé n'est pas remplacé
        silencieusement par un nouveau qui prétendrait le même nom. -->
   <auth>
-    <disabled>no</disabled>
+    <!-- FERMÉ PAR DÉFAUT, et ce n'est pas de la prudence décorative : mesuré en
+         répétition à blanc (`P01.21`), `wazuh-authd` écoute sur **0.0.0.0**
+         et non sur l'adresse du tailnet. Wazuh n'offre aucune option pour lier
+         ce démon à une interface : `<auth>` n'a pas d'équivalent du `local_ip`
+         de `<remote>`. Laisser l'enrôlement ouvert exposerait donc le port
+         d'inscription — et le secret qui le protège — au LAN, ce que C4
+         interdit. Le contrôle d'écoute de `20_armement.yml` le refuse, à juste
+         titre.
+         L'enrôlement devient donc une FENÊTRE, ouverte par un humain, le temps
+         d'inscrire les agents, puis refermée :
+           -e '{"sentinel_server_authd_ouvert": true}'
+         Voir docs/runbooks/mise-en-service.md § 2. -->
+    <disabled>{{ 'no' if sentinel_server_authd_ouvert | bool else 'yes' }}</disabled>
     <port>{{ sentinel_server_port_enrolement }}</port>
     <use_source_ip>no</use_source_ip>
     <purge>no</purge>
@@ -72,6 +84,89 @@
       <enabled>no</enabled>
     </force>
   </auth>
+
+  <!-- ══ AUTO-SURVEILLANCE DU NŒUD (agent local 000) ═══════════════════════
+       Cet hôte porte le serveur central, donc il NE PORTE PAS d'agent :
+       `wazuh-agent` et `wazuh-manager` se déclarent en conflit au niveau du
+       paquet (mesuré 4.14.7). Sans les blocs ci-dessous, le nœud qui héberge
+       le moteur de sécurité serait le SEUL nœud non surveillé du parc — et
+       c'est justement celui où vivent les preuves.
+
+       Les listes viennent des mêmes variables `sentinel_fim_*` que l'agent
+       (group_vars/all) : une seule liste, deux lecteurs. Une divergence entre
+       les deux nœuds sur ce que « intégrité » veut dire serait invisible
+       jusqu'au jour où elle compte. `P01.21`. -->
+  <syscheck>
+    <disabled>no</disabled>
+    <frequency>{{ sentinel_server_fim_frequency_seconds }}</frequency>
+    <scan_on_start>yes</scan_on_start>
+{% for chemin in sentinel_fim_realtime_paths %}
+    <directories realtime="yes" report_changes="yes">{{ chemin }}</directories>
+{% endfor %}
+{% for chemin in sentinel_fim_nodiff_paths | default([]) %}
+    <nodiff>{{ chemin }}</nodiff>
+{% endfor %}
+  </syscheck>
+
+  <!-- Journaux système — LECTURE seule, comme sur un agent. -->
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/auth.log</location>
+  </localfile>
+
+  <localfile>
+    <log_format>syslog</log_format>
+    <location>/var/log/syslog</location>
+  </localfile>
+
+  <!-- auditd — sa configuration appartient à HQ ; on lit seulement. -->
+  <localfile>
+    <log_format>audit</log_format>
+    <location>/var/log/audit/audit.log</location>
+  </localfile>
+
+  <!-- Docker — la stack appartient à HQ ; on lit le démon, on ne le configure
+       pas. Ce nœud restaure la stack chaque nuit (mirror-sync) : les règles
+       `100353` et suivantes portent l'exclusion horaire correspondante. -->
+  <wodle name="docker-listener">
+    <disabled>no</disabled>
+    <interval>1m</interval>
+    <attempts>5</attempts>
+    <run_on_start>yes</run_on_start>
+  </wodle>
+
+  <!-- ══ JEU DE RÈGLES ═════════════════════════════════════════════════════
+       CE BLOC N'EST PAS DÉCORATIF. Mesuré sur `wazuh-manager:4.14.7` : sans
+       lui, le moteur charge quand même son jeu de base — mais PAS
+       `etc/rules`, c'est-à-dire aucune règle Sentinelle. Un événement de perte
+       de contact retombait alors sur la règle de base `504` au lieu de notre
+       `100501`. Le serveur aurait tourné, journalisé, et n'aurait appliqué
+       aucune des règles écrites par `P01.2`, `P01.8` et `P01.3` : le faux vert
+       exact que `.agent/RULES.md` § 1 interdit, et le plus difficile à voir
+       puisqu'il ne produit pas d'erreur, seulement du silence.
+
+       Le bloc reprend le jeu par défaut de l'éditeur AVANT d'ajouter le nôtre :
+       déclarer `etc/rules` seul remplacerait le défaut au lieu de l'étendre, et
+       on perdrait les listes CDB. Sentinelle AJOUTE, elle ne réécrit pas — la
+       même règle que pour HQ (`H3`). -->
+  <ruleset>
+    <!-- Jeu par défaut de l'éditeur — recopié tel quel. -->
+    <decoder_dir>ruleset/decoders</decoder_dir>
+    <rule_dir>ruleset/rules</rule_dir>
+    <rule_exclude>0215-policy_rules.xml</rule_exclude>
+    <list>etc/lists/audit-keys</list>
+    <list>etc/lists/amazon/aws-eventnames</list>
+    <list>etc/lists/security-eventchannel</list>
+    <list>etc/lists/malicious-ioc/malware-hashes</list>
+    <list>etc/lists/malicious-ioc/malicious-ip</list>
+    <list>etc/lists/malicious-ioc/malicious-domains</list>
+
+    <!-- Jeu Sentinelle — les fichiers `sentinel-*.xml` posés par le rôle
+         depuis `rules/` du dépôt. Une règle éditée à la main ici disparaît au
+         prochain passage : c'est voulu (`rules/README.md`). -->
+    <decoder_dir>etc/decoders</decoder_dir>
+    <rule_dir>etc/rules</rule_dir>
+  </ruleset>
 
   <!-- ══ RÉTENTION (G1) ════════════════════════════════════════════════════
        90 jours en ligne, 12 mois d'archive compressée. Pas de recherche

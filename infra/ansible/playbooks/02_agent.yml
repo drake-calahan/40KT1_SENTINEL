@@ -35,11 +35,46 @@
           ({{ groups['sentinel_agents_linux'] | length }} hôte(s))
         quiet: true
 
+    # Le play qui suit exclut l'hôte du manager. Si cette exclusion vidait la
+    # cible, le playbook rendrait « ok » sans toucher personne — le mode de
+    # panne que la garde ci-dessus existe pour attraper, une ligne plus bas.
+    - name: L'exclusion de l'hôte du manager laisse au moins un agent à poser
+      ansible.builtin.assert:
+        that:
+          - groups['sentinel_agents_linux']
+            | difference(groups['sentinel_server'] | default([]))
+            | length > 0
+        fail_msg: >-
+          Après exclusion de l'hôte du serveur central
+          ({{ groups['sentinel_server'] | default([]) | join(', ') }}), il ne
+          reste AUCUN agent à poser. Un agent ne s'installe pas sur le manager :
+          les deux paquets sont en conflit (mesuré 4.14.7), et le manager se
+          surveille lui-même. Si le parc n'a plus qu'un nœud, ce playbook n'a
+          rien à faire — mais il ne doit pas rendre « ok » en le taisant.
+        success_msg: >-
+          agents à poser :
+          {{ groups['sentinel_agents_linux']
+             | difference(groups['sentinel_server'] | default([])) | join(', ') }}
+        quiet: true
+
 # ══════════════════════════════════════════════════════════════════════════
 # PLAY 2 — Le rôle.
 # ══════════════════════════════════════════════════════════════════════════
+# ⚠️ `:!sentinel_server` — L'HÔTE DU MANAGER NE PORTE PAS D'AGENT, et ce n'est
+# pas un choix : `wazuh-agent` et `wazuh-manager` se DÉCLARENT en conflit au
+# niveau du paquet (« wazuh-agent : Conflicts: wazuh-manager », mesuré 4.14.7 en
+# répétition à blanc, `P01.21`). Installer les deux sur `patator-standby` est
+# impossible, pas seulement déconseillé — `apt` refuse.
+#
+# Le nœud n'est pas pour autant aveugle : le manager se surveille LUI-MÊME
+# (agent local, identifiant 000). C'est `sentinel_server/templates/ossec.conf.j2`
+# qui porte sa surveillance d'intégrité et ses journaux, à partir des MÊMES
+# variables `sentinel_fim_*` que l'agent — une seule liste, deux lecteurs.
+#
+# Le rôle `sentinel_agent` refuse de son côté de s'exécuter sur cet hôte : une
+# exclusion écrite à un seul endroit se contourne d'un `--limit`.
 - name: Agents Sentinelle — livrés désarmés, un nœud à la fois
-  hosts: sentinel_agents_linux
+  hosts: sentinel_agents_linux:!sentinel_server
   gather_facts: true
   become: false
   serial: 1

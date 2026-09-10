@@ -120,3 +120,19 @@ sentinel_server_desinstaller: false
 # même geste, et le second ne s'improvise pas (`RULES` § 4 — les journaux
 # décrivent l'infrastructure entière).
 sentinel_server_purger_etat: false
+
+# --- La fenêtre d'enrôlement (`P01.21`) -------------------------------------
+# `false` : le démon d'enrôlement (`wazuh-authd`) est FERMÉ. Il n'écoute pas,
+# donc aucun agent ne peut s'inscrire — et c'est l'état nominal hors mise en
+# service.
+#
+# Motif, mesuré et non supposé : `wazuh-authd` se lie à `0.0.0.0` et Wazuh
+# n'offre aucune option pour le restreindre à une interface (`<auth>` n'a pas
+# de `local_ip`). Ouvert en permanence, le port d'inscription serait joignable
+# depuis le LAN — c'est-à-dire hors tailnet, ce que C4 interdit. Le contrôle
+# d'écoute de l'armement le refuse d'ailleurs, et il a raison.
+#
+# Ouvrir est un geste d'exploitation, borné dans le temps :
+#   ansible-playbook playbooks/01_server.yml #     -e '{"sentinel_server_enabled": true, "sentinel_server_authd_ouvert": true}'
+# … inscrire les agents, puis REFERMER en rejouant sans le drapeau.
+sentinel_server_authd_ouvert: false
