@@ -5,8 +5,10 @@
     · tailnet Tailscale tail29e268.ts.net → plage CGNAT 100.64.0.0/10
     · LAN secours 192.168.1.0/24
     · loopback 127.0.0.0/8
-  Options de règle : <srcip> et <user> (alias dstuser) sont documentées ;
-  <srcuser>/<dstuser> comme balises de règle sont refusées par analysisd.
+  Mesuré sur wazuh-manager 4.14.7 :
+    · <srcip>a,b,c</srcip> refusé → exclusions level 0 par CIDR ;
+    · 100205 doit chaîner sur les exclusions (100261–263), sinon le frère 100202
+      gagne et un root depuis le tailnet reste level 0.
 -->
 <group name="syslog,sshd,sentinel,authentification,ssh,">
 
@@ -21,13 +23,52 @@
   </rule>
 
   <!--
-    Attrape toute connexion SSH réussie dont l'adresse source n'est ni tailnet, ni LAN secours, ni loopback.
-    Une nouvelle machine du PO ou une adresse tailnet hors CGNAT non encore inscrite ici peut déclencher à tort — mettre à jour la liste CIDR.
+    Attrape toute connexion SSH réussie ; les sources connues sont exclues ci-dessous (level 0).
+    Une nouvelle machine du PO hors liste CIDR peut déclencher à tort — ajouter une exclusion, ne pas baisser la sévérité.
   -->
   <rule id="100202" level="14">
     <if_sid>5715</if_sid>
-    <srcip negate="yes">100.64.0.0/10,192.168.1.0/24,127.0.0.0/8</srcip>
     <description>Authentification (critique) : connexion SSH réussie depuis une source jamais vue</description>
+  </rule>
+
+  <!--
+    Exclusion : connexions depuis le tailnet Tailscale (CGNAT 100.64.0.0/10).
+    Motif : chemin d'administration nominal du parc (MagicDNS tail29e268.ts.net).
+  -->
+  <rule id="100261" level="0">
+    <if_sid>100202</if_sid>
+    <srcip>100.64.0.0/10</srcip>
+    <description>Exclusion : SSH depuis le tailnet (100.64.0.0/10)</description>
+  </rule>
+
+  <!--
+    Exclusion : connexions depuis le LAN secours.
+    Motif : SSH depuis 192.168.1.0/24 autorisé en secours (ufw HQ).
+  -->
+  <rule id="100262" level="0">
+    <if_sid>100202</if_sid>
+    <srcip>192.168.1.0/24</srcip>
+    <description>Exclusion : SSH depuis le LAN secours (192.168.1.0/24)</description>
+  </rule>
+
+  <!--
+    Exclusion : connexions loopback.
+    Motif : sessions locales / contrôles, pas une source externe.
+  -->
+  <rule id="100263" level="0">
+    <if_sid>100202</if_sid>
+    <srcip>127.0.0.0/8</srcip>
+    <description>Exclusion : SSH depuis loopback (127.0.0.0/8)</description>
+  </rule>
+
+  <!--
+    Attrape une connexion SSH réussie en root depuis une source connue (après exclusion).
+    Un root depuis une source inconnue reste couvert par 100202 (critique). Dépannage PO : à consigner.
+  -->
+  <rule id="100205" level="11">
+    <if_sid>100261,100262,100263</if_sid>
+    <user>^root$</user>
+    <description>Authentification (rouge) : session root interactive SSH</description>
   </rule>
 
 </group>
