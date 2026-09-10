@@ -73,6 +73,22 @@ n'y est plus). `<srcip>` reste une option valide, **mais une seule CIDR par
 balise** : `100.64.0.0/10,192.168.1.0/24` est refusé (`Invalid ip address`) —
 mesuré `wazuh-manager:4.14.7`. Idiome : alerte + exclusions `level="0"` par
 réseau.
+
+### Champ FIM : `file` (pas `syscheck.path`)
+
+*2026-09-10 (revue P01.11 / P01.12 + Docker `wazuh/wazuh-manager:4.14.7`).* Les
+règles d'intégrité (`100101`–`100132`) filtrent sur
+`<field name="file" type="pcre2">…</field>`. C'est le **nom de champ décodé**
+documenté par Wazuh ([custom FIM rules](https://documentation.wazuh.com/current/user-manual/capabilities/file-integrity/creating-custom-fim-rules.html))
+: l'alerte indexer montre `syscheck.path`, la règle doit matcher `file`.
+`wazuh-analysisd -t` charge les dix-neuf règles Sentinelle sans erreur. Un
+passage `wazuh-logtest-legacy` sur un faux journal texte (`File '…' modified`)
+**ne décode pas** : les parents `550`/`553`/`554` sont des
+`decoded_as` plugin (`syscheck_integrity_changed` / `_deleted` / `_new_entry`),
+pas des lignes syslog — même limite que pour toute règle FIM custom. Le matching
+réel (ex. `100132` sur `/usr/sbin/tailscaled`) se prouve après pose agent, par
+événement FIM — geste d'exploitation, hors lot code.
+
 - Exposition publique par **tunnel sortant cloudflared** ; un seul connecteur à
   la fois (ADR-030 de HQ).
 - Les deux nœuds sont à **70 km** l'un de l'autre : ni compteur électrique, ni

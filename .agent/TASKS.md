@@ -208,11 +208,20 @@ partie, toujours.**
       `100131` (`/usr/bin/sudo.ws`) et démon Tailscale (`/usr/sbin/tailscaled`)
       + règle `100132`. Sans règle dédiée, le chemin surveillé restait un faux
       vert silencieux (événement générique sans sévérité Sentinelle).
+      **Limite logtest** : `analysisd -t` 4.14.7 accepte `field name="file"` ;
+      matching FIM réel = événement agent (plugin decoder), hors lot code —
+      voir `DISCOVERY.md` § champ FIM.
 - [x] **P01.12** (cursor, 2026-09-10) Cas `critique` `100101` : surveillance
       explicite de `/root/.ssh/authorized_keys` **et** de
-      `/home/calahan/.ssh/authorized_keys` (compte humain du parc). Le
-      `HOME` dynamique sous `become` ne suffit pas — il pointe souvent vers
-      `/root` et aveuglait `calahan`.
+      `/home/{{ ansible_user }}/.ssh/authorized_keys` (compte humain du parc).
+      Le `HOME` dynamique sous `become` ne suffit pas — il pointe souvent vers
+      `/root` et aveuglait le compte inventaire. **Limite** : rejeu sur machine
+      (toucher un `authorized_keys` → événement `100101`) = geste
+      d'exploitation après apply agent, hors cochage de ce lot code.
+- [ ] **P01.18** (cursor) **Valider `<nodiff>` FIM sur agent réel** — gabarit +
+      `sentinel_fim_nodiff_paths` (`.env`, clés, binaires) livrés avec
+      `P01.11`/`P01.12`. Reste : après apply, confirmer qu'un changement du
+      `.env` n'embarque **pas** le diff de secrets dans l'alerte.
 
 ## Suites de la revue de `P01.1` — ouvertes le 2026-09-09
 
