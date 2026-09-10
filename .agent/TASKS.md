@@ -109,6 +109,24 @@ partie, toujours.**
 >
 > **Plus bloqué** : plus rien côté décisions — les trois ADR sont *Acceptées* et
 > l'amorce est sur `main`.
+>
+> **2026-09-10 — quatre PR de `cursor` fusionnées, puis passe de `claude`.**
+> `P01.8` (PR #17), `P01.11`/`P01.12` (PR #18), `P01.17` (PR #19) et `P03.2`
+> (PR #20) sont sur `main`. La fusion de la PR #20 a **réintroduit deux blocs
+> périmés dans ce fichier** — un doublon de `P01.1` et l'ancienne ligne `[ ]`
+> de `P01.17`, qui décochait un lot rendu. Retirés. *Ce que ça enseigne* : ce
+> fichier est l'état partagé, et un conflit de fusion mal résolu dedans se lit
+> comme une tâche à refaire.
+>
+> Dans la foulée, `claude` a rendu les trois lots qui ne dépendaient ni d'une
+> machine ni d'un arbitrage : **`P01.15`** et **`P01.16`** (les moitiés agent,
+> débloquées par la fusion de la PR #13 — les deux rôles jumeaux se relisent
+> de nouveau à l'identique) et **`P03.10`** (gel collant en mode à blanc,
+> révélé par la revue de `P03.2`).
+>
+> **Ce qui reste à `claude`** : `P01.3` (la règle anti-rafale, maintenant qu'un
+> agent existe), puis ce qui se mesure sur la machine (`P01.14`, `P03.9`) ou
+> attend un arbitrage PO (`P01.13`, `P03.8`) ou un dépôt tiers (`P00.5`).
 
 - [x] **P00.0** Amorce du dépôt : harnais `.agent/`, couche Cursor, hub docs,
       trois ADR au statut *Proposé*, plan `P01`, contrat de frontière avec HQ,
@@ -238,7 +256,7 @@ partie, toujours.**
 > C'est le prix du gabarit, et il vaut le coup — mais il impose de relire le
 > modèle quand on relit la copie.
 
-- [~] **P01.15** (claude, 2026-09-09) **Le premier geste imposé par le dépôt
+- [x] **P01.15** (claude, 2026-09-10) **Le premier geste imposé par le dépôt
       échouait sur un hôte vierge.** `RULES` et `AGENTS` imposent
       `--check --diff` avant tout `apply`. Or, dans les deux rôles, la tâche
       « s'assurer que l'unité n'est ni activée ni démarrée » interroge
@@ -254,10 +272,11 @@ partie, toujours.**
       `systemctl list-unit-files` avant d'être touchée ; absente en `--check`,
       elle entre au bilan avec ce qu'elle ne prouve pas (« ce `--check` ne
       prouve donc PAS que le moteur restera à l'arrêt ») ; absente hors
-      `--check`, le rôle **refuse de poursuivre**. **Reste la moitié agent** —
-      elle ne s'écrit pas tant que la PR #13 est ouverte, sous peine de
-      réécrire sous les pieds de `cursor`. À reprendre à sa fusion.
-- [~] **P01.16** (claude, 2026-09-09) **La clé du dépôt transitait par un
+      `--check`, le rôle **refuse de poursuivre**. **Moitié agent portée le
+      2026-09-10**, à la fusion de la PR #13 : même relevé par
+      `service_facts`, même distinction `--check` / apply, même refus de
+      poursuivre. Les deux rôles jumeaux se lisent de nouveau à l'identique.
+- [x] **P01.16** (claude, 2026-09-10) **La clé du dépôt transitait par un
       chemin prévisible de `/tmp`.** Les deux rôles téléchargeaient la clé GPG
       dans `/tmp/sentinel-repo-key.asc` / `/tmp/sentinel-agent-repo-key.asc` en
       `0644`, relevaient son empreinte, puis la dé-blindaient — trois
@@ -268,7 +287,10 @@ partie, toujours.**
       répertoire `0700` appartenant à `root`, la clé y est écrite en `0600`
       `root:root`, et c'est le **répertoire** qui est retiré à la fin. La
       fenêtre n'est pas rétrécie, elle est supprimée : le chemin n'est plus
-      devinable. **Reste la moitié agent**, à la fusion de la PR #13.
+      devinable. **Moitié agent portée le 2026-09-10** : `/tmp/sentinel-agent-
+      repo-key.asc` en `0644` a disparu du rôle `sentinel_agent`.
+      **Limite** : le rejeu sur machine (`--check --diff` réel) reste un geste
+      d'exploitation — ce lot ne prouve que la lecture du code.
 
 ## Phase 1 — Observation seule
 
@@ -342,10 +364,6 @@ partie, toujours.**
       Pose désarmée ; `--check --diff` réel sur machine = geste d'exploitation
       (empreinte clé + `.env`), hors cochage de ce lot code. Suites `P01.11` /
       `P01.12` : PR #18.
-      [brief](briefs/P01.1-role-sentinel-agent.md). Suites `P01.11` / `P01.12`
-      closes le 2026-09-10. **Fusionné PR #13** ; CI verte. Pose désarmée ;
-      `--check --diff` réel sur machine = geste d'exploitation (empreinte clé
-      + `.env`), hors cochage de ce lot code.
 - [x] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
       [brief](briefs/P01.8-regles-auth-docker.md). **Fusionné PR #17** (2026-09-10).
       *Revue : retiré privileged / socket / port `0.0.0.0` du lot — hors flux
@@ -356,10 +374,6 @@ partie, toujours.**
       ([`DISCOVERY.md`](DISCOVERY.md) § réseau ;
       [brief](briefs/P01.17-sonde-inspection-docker.md)). Unités
       `sentinel-inspection-docker.{service,timer}` livrées désarmées ;
-- [ ] **P01.17** (cursor) Sonde d'inspection Docker (lecture seule) : détecter
-      conteneur `--privileged`, montage de `docker.sock`, port publié sur
-      `0.0.0.0` — cas que `docker events` / `P01.8` ne voient pas
-      ([`DISCOVERY.md`](DISCOVERY.md) § réseau). Unité `sentinel-*` désarmée ;
       `ok` / `ko` / `unknown`. Hors périmètre : configurer le démon (HQ).
       **Limite** : enable du timer + lecture sur parc réel = geste
       d'exploitation, hors cochage de ce lot code.
@@ -538,14 +552,22 @@ alerte réelle traitée de bout en bout.
       [`docs/runbooks/mode-a-blanc.md`](../docs/runbooks/mode-a-blanc.md).
       *Pas encore jouable sur machine : rien d'installé ; le format journal est
       celui de `responder/executeur.py`. Revue : distinguer désarmé / à blanc via
-      `armement` ; budget compte mais gel non collant → `P03.10`.*
-- [ ] **P03.10** (claude) **Gel collant en mode à blanc** — `budget.geler()` n'est
-      appelé que sur les chemins où le geste a été *joué* ; en `aurait_execute`,
-      le témoin `budget-gele` n'est jamais posé et le gel se relâche avec la
-      fenêtre. Appeler `geler()` quand `etat_budget is DERNIER` sur le chemin
-      dry-run, ou documenter pourquoi non. Révélé par la revue de `P03.2`.
-      *Bonus* : aligner le docstring de `responder/config.py` (`_VRAI` /
-      `_FAUX`, pas « true » littéral seul).
+      `armement` ; budget compte mais gel non collant → `P03.10`, **corrigé le
+      2026-09-10**.*
+- [x] **P03.10** (claude, 2026-09-10) **Gel collant en mode à blanc.**
+      `budget.geler()` n'était appelé que sur les chemins où le geste avait été
+      *joué* : en `aurait_execute`, le témoin `budget-gele` n'était jamais posé
+      et le gel se relâchait tout seul en sortant de la fenêtre glissante, là
+      où le mode armé attend un dégel humain. Le mode à blanc prouvait donc un
+      budget **plus permissif** que celui qu'on veut armer — l'inverse de ce
+      que promet l'en-tête de `responder/executeur.py`. `geler()` est désormais
+      appelé sur le chemin `aurait_execute` quand `etat_budget is DERNIER`, et
+      la garde mord dans les deux sens : le test vieillit le journal d'un jour
+      et le 4ᵉ ordre reste refusé `critique` (il échoue sans le correctif).
+      Docstring de `responder/config.py` aligné sur `_VRAI` / `_FAUX`.
+      Runbook `mode-a-blanc.md` § intro et § 5 remis à l'état réel : le
+      `degel` humain s'exerce maintenant **pendant** la période à blanc.
+      Révélé par la revue de `P03.2`.
 - [ ] **P03.3** (cursor + PO) Runbook de désarmement d'urgence **testé depuis un
       téléphone** — [brief](briefs/P03.3-runbook-desarmement.md).
       *Brief encore esquisse : attend `P03.2` livré et un témoin lu pour de vrai.*

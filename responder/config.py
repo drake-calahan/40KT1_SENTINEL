@@ -4,10 +4,11 @@ Aucune valeur sensible n'est écrite ici : les noms viennent de `.env.example`,
 les valeurs vivent dans le `.env` de la machine, qui n'est jamais committé.
 
 **La règle de lecture, et c'est une règle de sécurité** : une valeur absente,
-vide ou incompréhensible ne devient jamais l'état permissif. `SENTINEL_RESPONSE_
-ENABLED` n'est vrai que s'il vaut exactement « true » ; `SENTINEL_RESPONSE_DRY_
-RUN` n'est faux que s'il vaut exactement « false ». Une faute de frappe désarme,
-elle n'arme pas.
+vide ou incompréhensible ne devient jamais l'état permissif.
+`SENTINEL_RESPONSE_ENABLED` n'est vrai que s'il dit clairement oui (`_VRAI` :
+`true`, `1`, `oui`, `yes`, casse et espaces indifférents) ;
+`SENTINEL_RESPONSE_DRY_RUN` n'est faux que s'il dit clairement non (`_FAUX` :
+`false`, `0`, `non`, `no`). Une faute de frappe désarme, elle n'arme pas.
 """
 
 import os

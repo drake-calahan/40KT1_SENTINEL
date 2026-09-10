@@ -1,6 +1,6 @@
 # ACTIVE.md — Index actif (lecture obligatoire)
 
-> **État au 2026-09-07 : dépôt amorcé, cadrage répondu (30/30), rien n'est installé
+> **État au 2026-09-10 : dépôt amorcé, cadrage répondu (30/30), rien n'est installé
 > ni armé.** Aucune machine du parc ne porte quoi que ce soit de ce dépôt.
 > **Les trois ADR sont *Acceptées*** (2026-09-07) : `P1` et l'écriture de
 > l'exécuteur sont débloquées ; `ADR-001` a été acceptée en `P00.2`. Le contrat de
@@ -33,8 +33,9 @@ d'intégrité) est **fusionnée après trois corrections de revue**, et `P00.11`
 complète — sept formes valides passaient encore au vert. Deux suites hors lot
 restent ouvertes (`P01.11`, `P01.12`), toutes deux à traiter dans `P01.1`.
 
-**`P01.1`** (`cursor` — rôle `sentinel_agent`) est **rendu et relu** (PR #13,
-2026-09-09) : le lot tient, **quatre corrections sont demandées avant fusion**.
+**`P01.1`** (`cursor` — rôle `sentinel_agent`) est **rendu, relu et fusionné**
+(PR #13, 2026-09-09) : le lot tenait, **quatre corrections ont été demandées et
+rendues avant fusion**.
 La plus notable n'est pas un défaut d'écriture mais une asymétrie que le gabarit
 ne pouvait pas attraper — sur un **agent**, un `<active-response>` absent vaut
 `disabled=no`, là où sur le manager l'absence ne définit aucune commande. Le
@@ -46,9 +47,37 @@ deux rôles à la fois — le `--check` obligatoire qui échoue sur un hôte vie
 (`P01.15`) et la clé de dépôt qui transite par un chemin fixe de `/tmp`
 (`P01.16`).
 
-Ce qui part maintenant : `cursor` rend les quatre corrections de `P01.1` ·
-`claude` prend `P01.15` puis `P01.16` · **porter le jumeau du contrat dans HQ**
-(`P00.5`, dernière moitié — dépôt tiers).
+**2026-09-10 — la vague `cursor` est rentrée, et `claude` a soldé ses trois
+lots sans machine.** Quatre PR fusionnées : `P01.8` (#17, règles
+authentification et événements Docker), `P01.11`/`P01.12` (#18, chemins FIM
+alignés sur les règles), `P01.17` (#19, sonde d'inspection Docker) et `P03.2`
+(#20, runbook du mode à blanc). La revue de `P03.2` a ouvert `P03.10`, et la
+fusion de la PR #20 a laissé deux blocs périmés dans `TASKS.md` — un doublon de
+`P01.1` et l'ancienne ligne `[ ]` de `P01.17` — depuis retirés. Un conflit mal
+résolu dans le seul état partagé du dépôt se lit comme du travail à refaire.
+
+Dans la foulée, `claude` a rendu les trois lots qui ne dépendaient ni d'une
+machine ni d'un arbitrage :
+
+- **`P01.15` et `P01.16`, moitiés agent** — débloquées par la fusion de la
+  PR #13. Le `--check` obligatoire ne plante plus sur un hôte vierge (l'unité
+  est relevée par `service_facts` ; absente en `--check` elle entre au bilan,
+  absente après un apply elle arrête le rôle), et la clé du dépôt ne transite
+  plus par `/tmp/sentinel-agent-repo-key.asc` en `0644` mais par un répertoire
+  `0700` root créé pour l'occasion. Les deux rôles jumeaux se relisent de
+  nouveau à l'identique — c'est tout l'intérêt d'avoir corrigé le gabarit et la
+  copie en même temps.
+- **`P03.10` — le gel du budget est collant en mode à blanc.** `geler()`
+  n'était appelé que là où le geste avait été *joué* : en `aurait_execute`, le
+  témoin `budget-gele` n'était jamais posé et le gel se relâchait avec la
+  fenêtre glissante. Le mode à blanc prouvait donc un budget **plus permissif**
+  que celui qu'on veut armer. Conséquence pratique pour la période
+  d'observation : le `degel` humain s'exerce désormais **pendant** les quatorze
+  jours, et non « en armement contrôlé, plus tard ».
+
+Ce qui part maintenant : `claude` prend `P01.3` (règle anti-rafale — un agent
+existe enfin) · **porter le jumeau du contrat dans HQ** (`P00.5`, dernière
+moitié — dépôt tiers).
 
 **2026-09-09 — quatre arbitrages rendus par le PO** (`A1`–`A3`, `B`). Ce qui en
 sort :
