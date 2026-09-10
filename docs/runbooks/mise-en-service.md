@@ -41,7 +41,7 @@ Le serveur central en **profil frugal** et les agents sur les deux nœuds Linux,
 en **observation seule** : aucune alerte poussée, aucune réponse. On mesure le
 bruit de fond.
 
-## Avant de commencer — quatre vérifications
+## Avant de commencer — cinq vérifications
 
 1. **`ADR-003` est acceptée** et l'hôte du serveur central est nommé. ✅ fait.
    Sans cela, on installe au mauvais endroit et on ré-enrôle tout plus tard.
@@ -61,10 +61,89 @@ bruit de fond.
 
    La valeur ne passe **ni** par le dépôt, **ni** par l'inventaire, **ni** par
    un `-e`. Elle est générée sur la machine, jamais recopiée d'ailleurs.
-4. **L'élévation de privilège fonctionne** sur les deux nœuds. `sudo-rs` casse
+4. **Le poste de commande est prêt** — WSL sur `AEGIS-TOWER`, voir
+   [`poste-de-commande.md`](poste-de-commande.md). Ansible ne tourne pas sous
+   Windows, et un dépôt lu depuis `/mnt/c` fait ignorer `ansible.cfg`.
+5. **L'élévation de privilège fonctionne** sur les deux nœuds. `sudo-rs` casse
    `become` avec un message qui ressemble à un problème de réseau : le
    contournement (`ansible_become_exe: /usr/bin/sudo.ws`) est déjà dans
    l'inventaire, et `00_check.yml` vérifie qu'il tient encore.
+
+### Poser le `.env` — la marche à suivre, commande par commande
+
+> **Le poste de commande est WSL sur `AEGIS-TOWER`** (décision PO du
+> 2026-09-10) : sa préparation est dans
+> [`poste-de-commande.md`](poste-de-commande.md), à jouer **avant** ceci.
+
+**La clé d'enrôlement est la MÊME des deux côtés.** C'est un secret partagé :
+le serveur la pose dans `authd.pass` et l'agent la présente au premier contact.
+Deux valeurs différentes ne produisent pas une erreur claire — elles produisent
+un agent qui ne s'enrôle pas, sur un serveur qui refuse sans dire pourquoi. On
+la génère **une fois**, et on la recopie.
+
+**1. Générer la clé** — sur le poste de commande, une seule fois :
+
+```bash
+openssl rand -base64 48
+```
+
+Ne la coller ni dans le dépôt, ni dans un ticket, ni dans une conversation.
+Elle vit dans un gestionnaire de mots de passe, et dans deux fichiers `.env`.
+
+**2. Sur `patator-standby`** (le serveur central) :
+
+```bash
+sudo install -d -m 0755 -o root -g root /opt/sentinel
+sudo install -m 0600 -o root -g root /dev/null /opt/sentinel/.env
+sudo tee /opt/sentinel/.env >/dev/null <<'ENV'
+SENTINEL_NODE_NAME=patator-standby
+SENTINEL_NODE_ROLE=secondary
+SENTINEL_SERVER_HOST=patator-standby.tail29e268.ts.net
+SENTINEL_SERVER_ENROLL_PORT=1515
+SENTINEL_SERVER_EVENT_PORT=1514
+SENTINEL_ENROLL_KEY=<LA CLÉ GÉNÉRÉE À L'ÉTAPE 1>
+SENTINEL_RESPONSE_ENABLED=false
+SENTINEL_RESPONSE_DRY_RUN=true
+ENV
+sudo chmod 0600 /opt/sentinel/.env && sudo ls -l /opt/sentinel/.env
+```
+
+**3. Sur `patator-tower`** (le nœud primaire) — même clé, `SERVER_HOST` pointant
+vers le **serveur central**, pas vers lui-même :
+
+```bash
+sudo install -d -m 0755 -o root -g root /opt/sentinel
+sudo install -m 0600 -o root -g root /dev/null /opt/sentinel/.env
+sudo tee /opt/sentinel/.env >/dev/null <<'ENV'
+SENTINEL_NODE_NAME=patator-tower
+SENTINEL_NODE_ROLE=primary
+SENTINEL_SERVER_HOST=patator-standby.tail29e268.ts.net
+SENTINEL_SERVER_ENROLL_PORT=1515
+SENTINEL_SERVER_EVENT_PORT=1514
+SENTINEL_ENROLL_KEY=<LA MÊME CLÉ>
+SENTINEL_RESPONSE_ENABLED=false
+SENTINEL_RESPONSE_DRY_RUN=true
+ENV
+sudo chmod 0600 /opt/sentinel/.env && sudo ls -l /opt/sentinel/.env
+```
+
+**4. Vérifier sans lire la valeur** — ce qui compte est la présence, pas le
+contenu :
+
+```bash
+sudo grep -c '^SENTINEL_ENROLL_KEY=.\+' /opt/sentinel/.env   # doit rendre 1
+sudo grep -c '^SENTINEL_SERVER_HOST=.\+' /opt/sentinel/.env  # doit rendre 1
+sudo stat -c '%a %U:%G' /opt/sentinel/.env                   # doit rendre 600 root:root
+```
+
+Ce qui n'est **pas** à poser maintenant : `SENTINEL_API_TOKEN` (lot `P01.9`),
+le webhook Discord et les URL de push (lot `P02.0`, dont la première exigence
+est la preuve d'arrivée sur le téléphone). Un secret posé « pour plus tard »
+est un secret exposé sans usage.
+
+⚠️ `SENTINEL_RESPONSE_ENABLED=false` et `SENTINEL_RESPONSE_DRY_RUN=true` sont
+les défauts du dépôt et **ne se changent pas ici**. La réponse s'arme par
+`ADR-002` § 6, cinq portes, et le geste appartient au PO.
 
 ## Étape 0 — le contrôle de terrain, en lecture seule
 
