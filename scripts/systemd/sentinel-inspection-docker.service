@@ -1,0 +1,30 @@
+# Unités livrées **désarmées** — TASKS#P01.17.
+# Les poser sur une machine ≠ les activer. Armer le timer = geste d'exploitation
+# (runbook), jamais un merge. Préfixe sentinel-* obligatoire (contrat HQ).
+
+[Unit]
+Description=Sentinelle — inspection Docker (privileged / socket / ports exposés)
+Documentation=file:///opt/sentinel/scripts/inspection_docker.py
+# Après le démon Docker s'il existe ; la sonde rend unknown s'il est absent.
+After=docker.service
+# Ne pas exiger Docker : unknown > faux vert si le paquet n'est pas là.
+Wants=docker.service
+
+[Service]
+Type=oneshot
+# Tourne en root (pas de User=) : l'appartenance au groupe docker équivaut à
+# root via le socket — assumé pour une lecture seule d'inspection.
+# Durcissement : la sonde ne parle qu'au socket Unix Docker.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+ExecStart=/usr/bin/python3 /opt/sentinel/scripts/inspection_docker.py
+# ok=0, ko=1, unknown=2.
+# SuccessExitStatus=2 : l'absence de mesure n'est pas un échec de l'unité —
+# `systemctl is-failed` reste clair pour un vrai ko (exit 1). Le tri-état
+# complet se lit dans le journal (`etat=…`) ; P02.0 consommera cette ligne.
+SuccessExitStatus=2
+Nice=10

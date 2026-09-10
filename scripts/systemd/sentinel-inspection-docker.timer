@@ -1,0 +1,19 @@
+# Timer **désarmé par défaut** — TASKS#P01.17.
+# `systemctl enable --now sentinel-inspection-docker.timer` est un geste
+# d'exploitation, décrit par un runbook, joué par un humain. Pas par un merge.
+
+[Unit]
+Description=Sentinelle — cadence d'inspection Docker (désarmé jusqu'à enable)
+Documentation=file:///opt/sentinel/scripts/inspection_docker.py
+
+[Timer]
+# OnCalendar : Persistent=true rattrape réellement après une coupure
+# (contrairement à OnBootSec/OnUnitActiveSec, où Persistent est ignoré).
+# RandomizedDelaySec : les deux nœuds n'inspectent pas la même minute.
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=2min
+Unit=sentinel-inspection-docker.service
+
+[Install]
+WantedBy=timers.target

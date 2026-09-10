@@ -51,6 +51,7 @@ existe pour éviter.
 | [`P01.2`](P01.2-regles-integrite.md) | Règles d'intégrité | `cursor` | prêt |
 | [`P01.8`](P01.8-regles-auth-docker.md) | Règles authentification + Docker | `cursor` | en attente (`P01.2`) |
 | [`P01.1`](P01.1-role-sentinel-agent.md) | Rôle `sentinel_agent` | `cursor` | en attente (`P01.0`) |
+| [`P01.17`](P01.17-sonde-inspection-docker.md) | Sonde inspection Docker | `cursor` | prêt |
 | [`P01.9`](P01.9-rapports-hebdomadaires.md) | Rapports conformité + vulnérabilités | `cursor` | en attente (`P01.1`) |
 | [`P02.0`](P02.0-cablage-alerte.md) | Câblage de l'alerte | `cursor` | en attente (`P01.5`) |
 | [`P02.1`](P02.1-grille-severite.md) | Grille de sévérité | `cursor` | en attente (`P02.0`) |
