@@ -518,11 +518,15 @@ alerte réelle traitée de bout en bout.
       sous-ensemble documenté et refuse ce qu'il ne comprend pas — donc il se
       teste, mais il **ne s'arme pas**. À faire après `P01.1`, quand un agent
       existe pour produire une vraie enveloppe. **Porte d'armement de `P03.4`.**
-- [ ] **P03.2** (cursor) Mode à blanc — runbook de lecture du journal et
+- [x] **P03.2** (cursor, 2026-09-10) Mode à blanc — runbook de lecture du journal et
       définition d'un geste injustifié —
-      [brief](briefs/P03.2-runbook-mode-a-blanc.md).
+      [brief](briefs/P03.2-runbook-mode-a-blanc.md) ·
+      [`docs/runbooks/mode-a-blanc.md`](../docs/runbooks/mode-a-blanc.md).
+      *Pas encore jouable sur machine : rien d'installé ; le format journal est
+      celui de `responder/executeur.py`.*
 - [ ] **P03.3** (cursor + PO) Runbook de désarmement d'urgence **testé depuis un
       téléphone** — [brief](briefs/P03.3-runbook-desarmement.md).
+      *Brief encore esquisse : attend `P03.2` livré et un témoin lu pour de vrai.*
 - [ ] **P03.4** (claude — préparation · **PO — le geste**) Armement du catalogue
       minimal, hors mode tournoi d'abord. Les **cinq portes** sont posées
       (`ADR-002` § 6) ; restent le runbook rendu jouable, qui s'écrit sur le
