@@ -1,0 +1,155 @@
+---
+# Pose des règles de détection Sentinelle sur le serveur central.
+#
+# ── POURQUOI CE FICHIER EXISTE ─────────────────────────────────────────────
+# `rules/` porte vingt-trois règles écrites par trois lots (`P01.2`, `P01.8`,
+# `P01.3`) — et jusqu'ici RIEN ne les posait sur la machine. Un serveur central
+# installé sans elles tourne, journalise, et n'applique aucune détection du
+# dépôt : il ne produit pas d'erreur, seulement du silence. C'est le faux vert
+# le plus coûteux de tous, parce qu'il ressemble exactement à « rien ne s'est
+# passé ». `P01.19`.
+#
+# ── CE FICHIER NE DÉMARRE RIEN ─────────────────────────────────────────────
+# Poser une règle ne l'active pas : le moteur la lira à son prochain démarrage,
+# qui est un geste d'exploitation. Le `notify` suit la même règle que la
+# configuration — le handler refuse de démarrer une unité désarmée.
+
+- name: Relever le répertoire des règles du moteur
+  ansible.builtin.stat:
+    path: "{{ sentinel_server_regles_dest }}"
+  become: true
+  register: sentinel_server_regles_repertoire
+  changed_when: false
+
+# Même distinction que pour l'unité systemd (`P01.15`) : en `--check` sur un
+# hôte vierge, `apt` n'a rien installé, donc le répertoire n'existe pas — c'est
+# NORMAL et ça se signale. Après un apply, c'est un DÉFAUT.
+- name: Signaler que les règles ne peuvent pas être posées — attendu en `--check`
+  ansible.builtin.set_fact:
+    sentinel_server_points_signales: >-
+      {{ sentinel_server_points_signales + [
+           "Règles Sentinelle NON POSÉES : " ~ sentinel_server_regles_dest ~
+           " n'existe pas car en --check apt n'a rien installé. Ce --check ne "
+           ~ "prouve donc PAS que les règles du dépôt seront sur la machine ; "
+           ~ "le vérifier à l'apply, puis par wazuh-analysisd -t."
+         ] }}
+  when:
+    - not sentinel_server_regles_repertoire.stat.exists
+    - ansible_check_mode
+
+- name: Refuser de continuer si le répertoire des règles manque APRÈS une pose réelle
+  ansible.builtin.fail:
+    msg: >-
+      {{ sentinel_server_regles_dest }} est absent alors que
+      {{ sentinel_server_paquet }} vient d'être installé pour de bon (hors
+      --check). On NE POURSUIT PAS : la suite du rôle croirait avoir posé les
+      règles de détection, et le serveur tournerait sans aucune d'elles — un
+      silence qui ressemble à « rien ne s'est passé ».
+  when:
+    - not sentinel_server_regles_repertoire.stat.exists
+    - not ansible_check_mode
+
+- name: Recenser les règles du dépôt
+  ansible.builtin.find:
+    paths: "{{ sentinel_server_regles_source }}"
+    patterns: "*.xml"
+    recurse: true
+  delegate_to: localhost
+  become: false
+  register: sentinel_server_regles_locales
+  changed_when: false
+  check_mode: false
+
+# Une famille vide n'est pas une famille : si `rules/` ne rend aucun fichier,
+# c'est que le chemin est faux (dépôt déplacé, rôle joué hors du dépôt) — et
+# poser zéro règle en silence donnerait le serveur muet que ce fichier existe
+# pour empêcher.
+- name: Le dépôt porte bien des règles à poser
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_regles_locales.files | length > 0
+    fail_msg: >-
+      Aucune règle trouvée sous {{ sentinel_server_regles_source }}. Le rôle est
+      probablement joué depuis un dépôt incomplet ou déplacé. Poser zéro règle
+      sans le dire donnerait un serveur central qui ne détecte rien.
+    success_msg: >-
+      {{ sentinel_server_regles_locales.files | length }} règle(s) à poser
+    quiet: true
+
+- name: Poser les règles Sentinelle
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: >-
+      {{ sentinel_server_regles_dest }}/{{ sentinel_server_regles_prefixe }}{{
+      item.path | dirname | basename }}-{{ item.path | basename }}
+    owner: "{{ sentinel_server_owner }}"
+    group: "{{ sentinel_server_group }}"
+    mode: "{{ sentinel_server_config_mode }}"
+  become: true
+  loop: "{{ sentinel_server_regles_locales.files }}"
+  loop_control:
+    label: "{{ item.path | dirname | basename }}/{{ item.path | basename }}"
+  when: sentinel_server_regles_repertoire.stat.exists
+  notify: redemarrer le serveur central
+
+# Le dépôt fait autorité : une règle retirée du dépôt se retire de la machine.
+# Sans cette tâche, une règle supprimée en revue continuerait de tourner en
+# production, et personne ne saurait qu'elle existe — `rules/README.md` promet
+# l'inverse. Le filtre porte sur le préfixe `sentinel-` : rien de ce qui
+# appartient à l'éditeur ou à HQ n'est touché.
+- name: Relever les règles Sentinelle déjà posées
+  ansible.builtin.find:
+    paths: "{{ sentinel_server_regles_dest }}"
+    patterns: "{{ sentinel_server_regles_prefixe }}*.xml"
+  become: true
+  register: sentinel_server_regles_posees
+  changed_when: false
+  when: sentinel_server_regles_repertoire.stat.exists
+
+- name: Établir les noms que le dépôt justifie
+  ansible.builtin.set_fact:
+    sentinel_server_regles_attendues: >-
+      {{ sentinel_server_regles_locales.files
+         | map(attribute='path')
+         | map('regex_replace', '^.*[\/]([^\/]+)[\/]([^\/]+)$',
+               sentinel_server_regles_prefixe ~ '\1-\2')
+         | list }}
+
+- name: Retirer les règles Sentinelle qui ne sont plus dans le dépôt
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  become: true
+  loop: >-
+    {{ (sentinel_server_regles_posees.files | default([]) | map(attribute='path') | list)
+       | reject('in', sentinel_server_regles_attendues | map('regex_replace', '^',
+                sentinel_server_regles_dest ~ '/') | list)
+       | list }}
+  notify: redemarrer le serveur central
+
+# ── La preuve, et pas seulement la pose ────────────────────────────────────
+# `wazuh-analysisd -t` charge le jeu complet en mode test — il ne démarre rien,
+# n'écoute rien, et rend un code non nul si un fichier de règles est refusé.
+# Une règle mal formée fait refuser le FICHIER ENTIER par le moteur (mesuré en
+# revue de `P01.8`) : sans ce contrôle, la pose serait « verte » et la
+# détection absente.
+- name: Prouver que le moteur charge le jeu de règles posé
+  ansible.builtin.command:
+    cmd: "{{ sentinel_server_ossec_dir }}/bin/wazuh-analysisd -t"
+  become: true
+  register: sentinel_server_regles_chargees
+  changed_when: false
+  failed_when: sentinel_server_regles_chargees.rc != 0
+  when:
+    - sentinel_server_regles_repertoire.stat.exists
+    - not ansible_check_mode
+
+- name: Signaler que le chargement des règles n'a pas été prouvé — attendu en `--check`
+  ansible.builtin.set_fact:
+    sentinel_server_points_signales: >-
+      {{ sentinel_server_points_signales + [
+           "Chargement des règles NON PROUVÉ : wazuh-analysisd -t n'est pas "
+           ~ "joué en --check (le binaire n'existe pas encore). La preuve se "
+           ~ "prend à l'apply."
+         ] }}
+  when: ansible_check_mode

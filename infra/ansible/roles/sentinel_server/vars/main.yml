@@ -46,3 +46,20 @@ sentinel_server_api_conf: "/var/ossec/api/configuration/api.yaml"
 sentinel_server_unite: "wazuh-manager.service"
 sentinel_server_unites_autorisees:
   - "wazuh-manager.service"
+
+# --- Règles de détection (`P01.19`) -----------------------------------------
+# Le répertoire des règles utilisateur du moteur. Imposé par le paquet, et
+# déclaré dans `<ruleset>` de `ossec.conf.j2` — sans cette déclaration, le
+# moteur charge son jeu de base et IGNORE celui-ci (mesuré 4.14.7).
+sentinel_server_regles_dest: "/var/ossec/etc/rules"
+
+# Tout ce que ce dépôt pose porte ce préfixe, et rien d'autre n'est touché :
+# c'est ce qui rend le retrait sûr. Même doctrine que `sentinel-` pour les
+# unités systemd (docs/contrat-hq.md).
+sentinel_server_regles_prefixe: "sentinel-"
+
+# Les règles vivent à la racine du dépôt, pas dans le rôle : elles sont écrites
+# et relues par lots (`P01.2`, `P01.8`, `P01.3`) dont aucun n'est propriétaire
+# de ce rôle. `role_path` remonte à la racine — quatre niveaux :
+# roles/sentinel_server → roles → ansible → infra → dépôt.
+sentinel_server_regles_source: "{{ role_path }}/../../../../rules"

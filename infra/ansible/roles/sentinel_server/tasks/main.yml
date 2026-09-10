@@ -26,6 +26,13 @@
     - sentinel_server
     - sentinel_server_pose
 
+- name: Règles de détection — posées, jamais chargées ici
+  ansible.builtin.include_tasks: 15_regles.yml
+  when: not (sentinel_server_desinstaller | bool)
+  tags:
+    - sentinel_server
+    - sentinel_server_regles
+
 - name: Armement — uniquement sur geste explicite d'un humain
   ansible.builtin.include_tasks: 20_armement.yml
   when:
