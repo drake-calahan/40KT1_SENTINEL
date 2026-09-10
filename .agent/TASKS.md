@@ -204,24 +204,15 @@ partie, toujours.**
 > pas l'écrivain. Les trois corrections demandées *dans* le lot restent sur la
 > PR, pas ici.
 
-- [ ] **P01.11** (cursor, à traiter **dans `P01.1`**) Les règles de `P01.2`
-      surveillent des chemins que l'agent ne regarde pas. Deux cas mesurés sur
-      la PR #10 : `100131` vise `/usr/bin/sudo.ws`, absent de
-      `sentinel_fim_realtime_paths` — la règle ne mesurera **rien** ; `100130`
-      ne couvre que `/usr/bin/tailscale`, alors que `/usr/sbin/tailscaled` est
-      le démon **privilégié** et n'est pas surveillé. Pour chacun : ajouter le
-      chemin à la liste, **ou** retirer la règle. Une règle qui ne peut pas
-      recevoir d'événement est un faux vert silencieux — `RULES` § 1.
-- [ ] **P01.12** (cursor, à traiter **dans `P01.1`**) **La seule règle
-      `critique` du dépôt est aveugle à `root`.** `sentinel_fim_realtime_paths`
-      ne déclare que le `authorized_keys` de l'utilisateur Ansible
-      (`{{ HOME }}/.ssh/authorized_keys`). La règle `100101` est correctement
-      écrite — son motif attrape n'importe quel chemin — mais l'agent ne lui
-      enverra jamais d'événement pour `/root/.ssh/authorized_keys` ni pour les
-      autres comptes. Or « modification d'`authorized_keys` » est le premier des
-      **trois cas `critique`** de `F2`. Étendre la surveillance à `/root/.ssh/`
-      et aux comptes humains du parc, puis **rejouer le cas** : toucher un
-      `authorized_keys` de `root` doit produire un événement.
+- [x] **P01.11** (cursor, 2026-09-10) Chemins FIM alignés sur les règles
+      `100131` (`/usr/bin/sudo.ws`) et démon Tailscale (`/usr/sbin/tailscaled`)
+      + règle `100132`. Sans règle dédiée, le chemin surveillé restait un faux
+      vert silencieux (événement générique sans sévérité Sentinelle).
+- [x] **P01.12** (cursor, 2026-09-10) Cas `critique` `100101` : surveillance
+      explicite de `/root/.ssh/authorized_keys` **et** de
+      `/home/calahan/.ssh/authorized_keys` (compte humain du parc). Le
+      `HOME` dynamique sous `become` ne suffit pas — il pointe souvent vers
+      `/root` et aveuglait `calahan`.
 
 ## Suites de la revue de `P01.1` — ouvertes le 2026-09-09
 
@@ -335,15 +326,17 @@ partie, toujours.**
       vise désormais `/etc/logrotate.d/` · `100150` couvre les artefacts `ucf`.
       Les motifs d'exclusion trop larges (`.tmp`, `.cache`) ont été resserrés
       sur les artefacts réels.
-- [~] **P01.1** (cursor, 2026-09-09) Rôle `sentinel_agent` — agents sur
+- [x] **P01.1** (cursor, 2026-09-09) Rôle `sentinel_agent` — agents sur
       `patator-tower` et `patator-standby`, enrôlement par clé, aucun redémarrage
       de service de production déclenché par le rôle —
-      [brief](briefs/P01.1-role-sentinel-agent.md). Inclut les suites `P01.11` et
-      `P01.12` (alignement `sentinel_fim_realtime_paths`).
-- [~] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
-      [brief](briefs/P01.8-regles-auth-docker.md).
-      *Revue PR #17 (2026-09-10) : retiré privileged / socket / port `0.0.0.0`
-      du lot — hors flux `docker events` ; manque consignés → `P01.17`.*
+      [brief](briefs/P01.1-role-sentinel-agent.md). Suites `P01.11` / `P01.12`
+      closes le 2026-09-10. **Fusionné PR #13** ; CI verte. Pose désarmée ;
+      `--check --diff` réel sur machine = geste d'exploitation (empreinte clé
+      + `.env`), hors cochage de ce lot code.
+- [x] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
+      [brief](briefs/P01.8-regles-auth-docker.md). **Fusionné PR #17** (2026-09-10).
+      *Revue : retiré privileged / socket / port `0.0.0.0` du lot — hors flux
+      `docker events` ; manque consignés → `P01.17`.*
 - [ ] **P01.17** (cursor) Sonde d'inspection Docker (lecture seule) : détecter
       conteneur `--privileged`, montage de `docker.sock`, port publié sur
       `0.0.0.0` — cas que `docker events` / `P01.8` ne voient pas
