@@ -5,7 +5,7 @@
 <group name="syscheck,sentinel,integrite,binaires,">
 
   <!--
-    Attrape toute modification du binaire tailscale sous /usr/bin/.
+    Attrape toute modification du binaire CLI tailscale sous /usr/bin/.
     Une mise à jour manuelle de Tailscale (hors unattended-upgrades, liste noire) légitime peut déclencher à tort.
   -->
   <rule id="100130" level="11">
@@ -15,10 +15,21 @@
   </rule>
 
   <!--
+    Attrape toute modification du démon privilégié tailscaled (P01.11).
+    Sans cette règle, le chemin est surveillé mais aucun niveau Sentinelle ne se
+    déclenche — faux vert silencieux. Une mise à jour du paquet Tailscale peut
+    déclencher à tort.
+  -->
+  <rule id="100132" level="11">
+    <if_sid>550,553,554</if_sid>
+    <field name="file" type="pcre2">^/usr/sbin/tailscaled$</field>
+    <description>Intégrité (rouge) : démon tailscaled modifié</description>
+  </rule>
+
+  <!--
     Attrape toute modification du binaire sudo.ws (contournement sudo-rs pour Ansible sur Ubuntu 26.04).
     Une mise à jour du paquet sudo ou un basculement vers sudo-rs peut déclencher à tort lors d'une montée de version.
-    ATTENTE P01.1 : ce chemin n'est pas encore dans sentinel_fim_realtime_paths — la règle
-    ne mesurera rien tant que l'agent ne surveille pas ce binaire (sinon faux vert silencieux).
+    Chemin présent dans sentinel_fim_realtime_paths depuis P01.1 / P01.11.
   -->
   <rule id="100131" level="11">
     <if_sid>550,553,554</if_sid>

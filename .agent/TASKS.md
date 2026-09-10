@@ -204,24 +204,24 @@ partie, toujours.**
 > pas l'écrivain. Les trois corrections demandées *dans* le lot restent sur la
 > PR, pas ici.
 
-- [ ] **P01.11** (cursor, à traiter **dans `P01.1`**) Les règles de `P01.2`
-      surveillent des chemins que l'agent ne regarde pas. Deux cas mesurés sur
-      la PR #10 : `100131` vise `/usr/bin/sudo.ws`, absent de
-      `sentinel_fim_realtime_paths` — la règle ne mesurera **rien** ; `100130`
-      ne couvre que `/usr/bin/tailscale`, alors que `/usr/sbin/tailscaled` est
-      le démon **privilégié** et n'est pas surveillé. Pour chacun : ajouter le
-      chemin à la liste, **ou** retirer la règle. Une règle qui ne peut pas
-      recevoir d'événement est un faux vert silencieux — `RULES` § 1.
-- [ ] **P01.12** (cursor, à traiter **dans `P01.1`**) **La seule règle
-      `critique` du dépôt est aveugle à `root`.** `sentinel_fim_realtime_paths`
-      ne déclare que le `authorized_keys` de l'utilisateur Ansible
-      (`{{ HOME }}/.ssh/authorized_keys`). La règle `100101` est correctement
-      écrite — son motif attrape n'importe quel chemin — mais l'agent ne lui
-      enverra jamais d'événement pour `/root/.ssh/authorized_keys` ni pour les
-      autres comptes. Or « modification d'`authorized_keys` » est le premier des
-      **trois cas `critique`** de `F2`. Étendre la surveillance à `/root/.ssh/`
-      et aux comptes humains du parc, puis **rejouer le cas** : toucher un
-      `authorized_keys` de `root` doit produire un événement.
+- [x] **P01.11** (cursor, 2026-09-10) Chemins FIM alignés sur les règles
+      `100131` (`/usr/bin/sudo.ws`) et démon Tailscale (`/usr/sbin/tailscaled`)
+      + règle `100132`. Sans règle dédiée, le chemin surveillé restait un faux
+      vert silencieux (événement générique sans sévérité Sentinelle).
+      **Limite logtest** : `analysisd -t` 4.14.7 accepte `field name="file"` ;
+      matching FIM réel = événement agent (plugin decoder), hors lot code —
+      voir `DISCOVERY.md` § champ FIM.
+- [x] **P01.12** (cursor, 2026-09-10) Cas `critique` `100101` : surveillance
+      explicite de `/root/.ssh/authorized_keys` **et** de
+      `/home/{{ ansible_user }}/.ssh/authorized_keys` (compte humain du parc).
+      Le `HOME` dynamique sous `become` ne suffit pas — il pointe souvent vers
+      `/root` et aveuglait le compte inventaire. **Limite** : rejeu sur machine
+      (toucher un `authorized_keys` → événement `100101`) = geste
+      d'exploitation après apply agent, hors cochage de ce lot code.
+- [ ] **P01.18** (cursor) **Valider `<nodiff>` FIM sur agent réel** — gabarit +
+      `sentinel_fim_nodiff_paths` (`.env`, clés, binaires) livrés avec
+      `P01.11`/`P01.12`. Reste : après apply, confirmer qu'un changement du
+      `.env` n'embarque **pas** le diff de secrets dans l'alerte.
 
 ## Suites de la revue de `P01.1` — ouvertes le 2026-09-09
 
@@ -342,6 +342,10 @@ partie, toujours.**
       Pose désarmée ; `--check --diff` réel sur machine = geste d'exploitation
       (empreinte clé + `.env`), hors cochage de ce lot code. Suites `P01.11` /
       `P01.12` : PR #18.
+      [brief](briefs/P01.1-role-sentinel-agent.md). Suites `P01.11` / `P01.12`
+      closes le 2026-09-10. **Fusionné PR #13** ; CI verte. Pose désarmée ;
+      `--check --diff` réel sur machine = geste d'exploitation (empreinte clé
+      + `.env`), hors cochage de ce lot code.
 - [x] **P01.8** (cursor, 2026-09-09) Règles authentification et événements Docker —
       [brief](briefs/P01.8-regles-auth-docker.md). **Fusionné PR #17** (2026-09-10).
       *Revue : retiré privileged / socket / port `0.0.0.0` du lot — hors flux
@@ -352,6 +356,10 @@ partie, toujours.**
       ([`DISCOVERY.md`](DISCOVERY.md) § réseau ;
       [brief](briefs/P01.17-sonde-inspection-docker.md)). Unités
       `sentinel-inspection-docker.{service,timer}` livrées désarmées ;
+- [ ] **P01.17** (cursor) Sonde d'inspection Docker (lecture seule) : détecter
+      conteneur `--privileged`, montage de `docker.sock`, port publié sur
+      `0.0.0.0` — cas que `docker events` / `P01.8` ne voient pas
+      ([`DISCOVERY.md`](DISCOVERY.md) § réseau). Unité `sentinel-*` désarmée ;
       `ok` / `ko` / `unknown`. Hors périmètre : configurer le démon (HQ).
       **Limite** : enable du timer + lecture sur parc réel = geste
       d'exploitation, hors cochage de ce lot code.

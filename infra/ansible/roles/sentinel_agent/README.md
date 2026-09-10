@@ -40,6 +40,8 @@ Le rôle **échoue clairement** si l'une des deux manque.
 La liste des chemins surveillés en temps réel vient de
 `sentinel_fim_realtime_paths` dans `group_vars/all/main.yml`. Le rôle la
 transforme en blocs `<directories>` ; il ne la recopie pas dans `defaults/`.
+`sentinel_fim_nodiff_paths` alimente les `<nodiff>` : le contenu de ces
+fichiers (notamment le `.env` de HQ) ne doit pas voyager dans le diff d'alerte.
 
 ## Désinstallation
 
