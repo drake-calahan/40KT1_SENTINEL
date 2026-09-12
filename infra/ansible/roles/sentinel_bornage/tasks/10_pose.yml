@@ -74,6 +74,41 @@
     daemon_reload: true
   become: true
 
+# En `--check` sur un hôte vierge, les deux unités ci-dessus n'ont été que
+# SIMULÉES : systemd ne les connaît pas, et `systemd_service` échouait dessus
+# (« Could not find the requested service … »). Le dépôt IMPOSE `--check --diff`
+# en premier geste : le contrôle obligatoire ne rendait donc pas son verdict la
+# première fois — et comme ce rôle passe AVANT `sentinel_server` dans
+# `01_server.yml`, il arrêtait le tout premier `--check` du serveur central.
+# Même défaut, même parade que `P01.15` sur les deux autres rôles. Mesuré en
+# répétition à blanc sur un conteneur systemd vierge, 2026-09-10.
+#
+# Absente ne veut pas dire la même chose des deux côtés : en `--check` c'est
+# NORMAL (rien n'a été écrit) et ça se signale ; après un apply c'est un DÉFAUT
+# (nous venons de poser ces unités nous-mêmes) et le rôle refuse de continuer.
+# On relève les FICHIERS d'unité, pas `service_facts` : mesuré en répétition à
+# blanc, `service_facts` ne liste que les `.service` — le `.timer` en était
+# absent APRÈS un apply réussi, et la garde ci-dessous arrêtait le rôle sur une
+# unité pourtant bien posée. Ces deux unités sont écrites par ce rôle, à un
+# chemin qu'il connaît : les regarder là où il vient de les poser est à la fois
+# plus simple et plus vrai.
+- name: Relever les fichiers d'unité de l'interlock
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ item }}"
+  become: true
+  register: sentinel_bornage_fichiers_unites
+  changed_when: false
+  loop:
+    - "{{ sentinel_bornage_interlock_timer }}"
+    - "{{ sentinel_bornage_interlock_unite }}"
+
+- name: Établir si les unités de l'interlock existent
+  ansible.builtin.set_fact:
+    sentinel_bornage_unites_absentes: >-
+      {{ sentinel_bornage_fichiers_unites.results
+         | rejectattr('stat.exists')
+         | map(attribute='item') | list }}
+
 - name: S'assurer que l'interlock n'est ni activé ni démarré
   ansible.builtin.systemd_service:
     name: "{{ item }}"
@@ -83,7 +118,36 @@
     - "{{ sentinel_bornage_interlock_timer }}"
     - "{{ sentinel_bornage_interlock_unite }}"
   become: true
-  when: not (sentinel_bornage_interlock_enabled | bool)
+  when:
+    - not (sentinel_bornage_interlock_enabled | bool)
+    - item not in sentinel_bornage_unites_absentes
+
+- name: Signaler les unités que `--check` n'a pas pu poser
+  ansible.builtin.set_fact:
+    sentinel_bornage_points_signales: >-
+      {{ sentinel_bornage_points_signales + [
+           "Unités " ~ (sentinel_bornage_unites_absentes | join(', ')) ~
+           " ABSENTES : en --check elles n'ont été que simulées, donc systemd "
+           ~ "ne les connaît pas. NON JOUÉ ici : « ni activée ni démarrée » se "
+           ~ "vérifiera à l'apply. Ce --check ne prouve donc PAS que "
+           ~ "l'interlock restera à l'arrêt."
+         ] }}
+  when:
+    - sentinel_bornage_unites_absentes | length > 0
+    - ansible_check_mode
+
+- name: Refuser de continuer si une unité manque APRÈS une pose réelle
+  ansible.builtin.fail:
+    msg: >-
+      {{ sentinel_bornage_unites_absentes | join(', ') }} : absente(s) de
+      systemd alors que ce rôle vient de poser ces unités pour de bon (hors
+      --check) et d'appeler `daemon-reload`. On NE POURSUIT PAS : la suite
+      croirait avoir garanti « ni activée ni démarrée » sur une unité qu'elle
+      n'a jamais vue, et c'est exactement le faux vert que
+      .agent/RULES.md § 1 interdit.
+  when:
+    - sentinel_bornage_unites_absentes | length > 0
+    - not ansible_check_mode
 
 # ── Ce qu'on signale sans le jouer ────────────────────────────────────────
 - name: Signaler que l'interlock est posé mais désarmé

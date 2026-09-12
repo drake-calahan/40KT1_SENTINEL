@@ -8,6 +8,24 @@
 # posée AVANT le paquet (« policy-rc.d », plus bas) et retirée après.
 # ═══════════════════════════════════════════════════════════════════════════
 
+# La cadence FIM est écrite « 12h » dans group_vars, et `syscheck` veut des
+# secondes. Même conversion que dans le rôle agent — les deux nœuds doivent
+# lire la même valeur, sinon « toutes les 12 h » ne veut pas dire la même chose
+# des deux côtés du parc.
+- name: Convertir la cadence FIM en secondes pour syscheck
+  ansible.builtin.set_fact:
+    sentinel_server_fim_frequency_seconds: >-
+      {{
+        (sentinel_fim_scan_interval[:-1] | int * 3600)
+        if sentinel_fim_scan_interval is match('^[0-9]+h$')
+        else (
+          (sentinel_fim_scan_interval[:-1] | int * 60)
+          if sentinel_fim_scan_interval is match('^[0-9]+m$')
+          else (sentinel_fim_scan_interval | int)
+        )
+      }}
+  changed_when: false
+
 # ── 1. La clé du dépôt, vérifiée avant d'être posée ───────────────────────
 - name: Créer le répertoire des trousseaux
   ansible.builtin.file:
@@ -133,19 +151,55 @@
     mode: "0755"
   become: true
 
+# Sur un hôte VIERGE en `--check`, la tâche précédente n'a pas écrit le fichier
+# de dépôt : `apt` ne connaît donc pas encore `wazuh-manager`, et le module
+# échouait avec « No package matching 'wazuh-manager' is available ». Le dépôt
+# IMPOSE `--check --diff` en premier geste : ce contrôle obligatoire s'arrêtait
+# donc là, avant d'avoir montré quoi que ce soit de la configuration, du secret
+# ou des règles — c'est-à-dire au seul moment où on en a besoin. Mesuré en
+# répétition à blanc sur un conteneur vierge, 2026-09-10 (`P01.20`).
+- name: Relever si le dépôt du moteur est déjà déclaré sur la machine
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/sentinel-wazuh.list
+  become: true
+  register: sentinel_server_depot_present
+  changed_when: false
+
 - name: Installer le moteur, à la version épinglée
   ansible.builtin.apt:
     name: "{{ sentinel_server_paquet }}={{ sentinel_server_wazuh_version }}-*"
     state: present
     update_cache: true
   become: true
+  # Hors `--check`, la tâche s'exécute toujours : le dépôt vient d'être déclaré
+  # pour de bon juste au-dessus. En `--check`, elle ne s'exécute que si le dépôt
+  # était DÉJÀ là — sinon on demanderait à apt un paquet d'un dépôt qui n'existe
+  # pas encore sur cette machine.
+  when: not ansible_check_mode or sentinel_server_depot_present.stat.exists
   notify: redemarrer le serveur central
+
+- name: Signaler que l'installation n'a pas pu être simulée — attendu en `--check`
+  ansible.builtin.set_fact:
+    sentinel_server_points_signales: >-
+      {{ sentinel_server_points_signales + [
+           "Installation de " ~ sentinel_server_paquet ~ " NON SIMULÉE : le "
+           ~ "dépôt de paquets n'est pas encore déclaré sur cette machine, "
+           ~ "donc apt ne connaît pas le paquet. Ce --check ne prouve donc PAS "
+           ~ "que la version " ~ sentinel_server_wazuh_version ~ " est servie "
+           ~ "par le dépôt. Rejouer un --check APRÈS le premier apply le "
+           ~ "prouvera ; c'est la limite d'un contrôle joué sur un hôte vierge."
+         ] }}
+  when:
+    - ansible_check_mode
+    - not sentinel_server_depot_present.stat.exists
 
 - name: Geler la version contre les mises à jour automatiques
   ansible.builtin.dpkg_selections:
     name: "{{ sentinel_server_paquet }}"
     selection: hold
   become: true
+  # Même motif : `dpkg` ne connaît pas un paquet qui n'est pas installé.
+  when: not ansible_check_mode or sentinel_server_depot_present.stat.exists
 
 - name: Lever l'interdiction de démarrage
   ansible.builtin.file:
@@ -228,6 +282,44 @@
   become: true
   notify: redemarrer le serveur central
 
+# ── Le contrôle qui évite un démarrage impossible à diagnostiquer ─────────
+# `wazuh-control` ne lit pas le XML : il cherche les balises `auth` et `cluster`
+# par un `grep -n`, prend le numéro de ligne pour délimiter le bloc, et passe le
+# tout à `sed`. Une SECONDE occurrence de la balise — dans un commentaire, par
+# exemple — lui donne deux numéros, son `sed` échoue, il attend soixante
+# secondes puis déclare « wazuh-authd did not start correctly » : l'unité
+# ENTIÈRE refuse de démarrer, pour un commentaire. Mesuré 4.14.7 en répétition
+# à blanc, et le message d'erreur ne dit rien de la vraie cause.
+- name: Relever les balises que `wazuh-control` compte dans la configuration
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      grep -c '<auth>\|</auth>\|<cluster>\|</cluster>' {{ sentinel_server_ossec_conf }}
+      || true
+    executable: /bin/bash
+  become: true
+  register: sentinel_server_balises_comptees
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: Aucune balise `auth` ou `cluster` en double dans la configuration
+  ansible.builtin.assert:
+    that:
+      - (sentinel_server_balises_comptees.stdout | default('0') | trim | int) <= 2
+    fail_msg: >-
+      La configuration rendue contient plus de deux occurrences des balises que
+      `wazuh-control` compte (auth / cluster) :
+      {{ sentinel_server_balises_comptees.stdout | default('?') | trim }}
+      trouvées. Presque toujours un COMMENTAIRE qui cite la balise. Conséquence :
+      le moteur refuse de démarrer avec « wazuh-authd did not start correctly »,
+      soixante secondes plus tard, sans dire pourquoi. Retirer les chevrons du
+      commentaire dans templates/ossec.conf.j2 — le nom de la balise en toutes
+      lettres suffit à se faire comprendre.
+    success_msg: "balises auth/cluster : une paire, comme il faut"
+    quiet: true
+  when: not ansible_check_mode
+
 - name: Rendre la configuration de l'API — écoute sur le tailnet seul
   ansible.builtin.template:
     src: api.yaml.j2
@@ -260,6 +352,32 @@
   become: true
   no_log: true
   notify: redemarrer le serveur central
+
+- name: Signaler que la fenêtre d'enrôlement est FERMÉE
+  ansible.builtin.set_fact:
+    sentinel_server_points_signales: >-
+      {{ sentinel_server_points_signales + [
+           "Enrôlement FERMÉ (wazuh-authd disabled). Aucun agent ne pourra "
+           ~ "s'inscrire tant que la fenêtre n'est pas ouverte — c'est l'état "
+           ~ "nominal : authd écoute sur 0.0.0.0 et Wazuh ne sait pas le lier "
+           ~ "au tailnet (C4). Ouvrir le temps d'inscrire les agents : -e "
+           ~ "{sentinel_server_authd_ouvert: true}, puis REFERMER. Runbook "
+           ~ "mise-en-service § 2."
+         ] }}
+  when: not (sentinel_server_authd_ouvert | bool)
+
+- name: Signaler que la fenêtre d'enrôlement est OUVERTE
+  ansible.builtin.set_fact:
+    sentinel_server_points_signales: >-
+      {{ sentinel_server_points_signales + [
+           "Enrôlement OUVERT : wazuh-authd écoutera sur 0.0.0.0:"
+           ~ sentinel_server_port_enrolement ~ " — donc AUSSI sur le LAN, "
+           ~ "puisque Wazuh ne sait pas le lier au tailnet. État TRANSITOIRE, "
+           ~ "à refermer dès les agents inscrits. Le contrôle d'écoute de "
+           ~ "l'armement refusera cet état, et c'est voulu : la fenêtre "
+           ~ "s'ouvre sur un serveur déjà armé, puis se referme."
+         ] }}
+  when: sentinel_server_authd_ouvert | bool
 
 # ── 7. Ce qu'on refuse de jouer, et qu'on signale ─────────────────────────
 # Le bornage `cgroup` (condition 1 d'ADR-003) et l'arrêt pendant la relève

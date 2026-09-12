@@ -14,6 +14,27 @@
       -e '{"sentinel_agent_enabled": true}'. Voir .agent/RULES.md § 1.
     quiet: true
 
+# `wazuh-agent` et `wazuh-manager` se déclarent en CONFLIT au niveau du paquet
+# (« wazuh-agent : Conflicts: wazuh-manager », mesuré 4.14.7). Sur l'hôte du
+# serveur central, `apt` refuserait — mais après que le rôle a déjà déclaré un
+# dépôt, posé une clé et écrit une configuration. Mieux vaut refuser AVANT, et
+# dire où la surveillance de ce nœud vit réellement. `P01.21`.
+- name: Cet hôte ne porte pas déjà le serveur central
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname not in (groups['sentinel_server'] | default([]))
+    fail_msg: >-
+      {{ inventory_hostname }} porte le SERVEUR CENTRAL : on n'y installe pas
+      d'agent. Les deux paquets sont en conflit déclaré ({{ sentinel_agent_paquet }}
+      / wazuh-manager), donc apt refuserait — et il n'y a rien à contourner :
+      un manager se surveille lui-même (agent local 000). La surveillance
+      d'intégrité et les journaux de ce nœud sont dans
+      roles/sentinel_server/templates/ossec.conf.j2, à partir des mêmes
+      variables `sentinel_fim_*`. Le playbook 02_agent.yml exclut déjà cet hôte
+      (`sentinel_agents_linux:!sentinel_server`) ; si vous êtes ici, c'est
+      probablement par un --limit.
+    quiet: true
+
 - name: Cet hôte appartient au groupe `sentinel_agents_linux`
   ansible.builtin.assert:
     that:

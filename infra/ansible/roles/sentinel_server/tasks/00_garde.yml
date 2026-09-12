@@ -16,6 +16,22 @@
       -e '{"sentinel_server_enabled": true}'. Voir .agent/RULES.md § 1.
     quiet: true
 
+# La fenêtre d'enrôlement s'ouvre par un drapeau, donc elle tombe sous le même
+# piège que la garde d'armement : `-e sentinel_server_authd_ouvert=false` passe
+# une CHAÎNE, et une chaîne non vide est vraie en Jinja — la commande tapée pour
+# refermer l'enrôlement l'ouvrirait.
+- name: La fenêtre d'enrôlement est un booléen, pas une chaîne
+  ansible.builtin.assert:
+    that:
+      - sentinel_server_authd_ouvert is defined
+      - sentinel_server_authd_ouvert is boolean
+    fail_msg: >-
+      « sentinel_server_authd_ouvert » n'est pas un booléen
+      ({{ sentinel_server_authd_ouvert | default(None) | type_debug }}).
+      Forme correcte : -e '{"sentinel_server_authd_ouvert": true}'.
+      Voir .agent/RULES.md § 1.
+    quiet: true
+
 # ── 2. Sommes-nous sur l'hôte qu'ADR-003 a tranché ? ───────────────────────
 # Le groupe `sentinel_server` porte un hôte et un seul. Si ce rôle s'exécute
 # ailleurs, quelqu'un a déplacé le serveur central par un `--limit` plutôt que

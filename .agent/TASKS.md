@@ -377,13 +377,70 @@ partie, toujours.**
       `ok` / `ko` / `unknown`. Hors périmètre : configurer le démon (HQ).
       **Limite** : enable du timer + lecture sur parc réel = geste
       d'exploitation, hors cochage de ce lot code.
-- [ ] **P01.3** (claude) Règle **anti-rafale** pour la perte de contact d'un
-      agent. **Le noyau est livré** (`bruit/`, voir `P02.2`) et le cas du standby
-      est rejoué en test : 6 h de panne sondée à la minute → **25 alertes au lieu
-      de 360**, et les quatre épisodes connus restent quatre ouvertures
-      distinctes. **Reste à câbler la règle de détection elle-même**
-      (`rules/agents/`) sur la sonde de contact — cela demande un agent qui
-      existe, donc `P01.1`.
+- [x] **P01.3** (claude, 2026-09-10) Règle **anti-rafale** pour la perte de
+      contact d'un agent — [`rules/agents/10-contact-agent.xml`](../rules/agents/10-contact-agent.xml),
+      plage `100500`–`100599`. Quatre règles : perte de contact (`100501`,
+      orange), **cas `patator-standby` agrégé sur 15 min** par `<ignore>900</ignore>`
+      (`100502`), retour de contact (`100503`, info — sans clôture une alerte
+      finit classée `indeterminee`) et **retrait d'un agent** (`100505`, rouge :
+      c'est un geste, pas une panne, et `MITRE T1562.001` le dit déjà).
+      **Mesuré `wazuh-manager:4.14.7`** (Docker, `analysisd -t` + `logtest`) :
+      `100501` sur la tour, `100502` sur le standby, et le **deuxième**
+      événement du standby ne produit PAS d'alerte — l'agrégation mord. Deux
+      découvertes en écrivant : le premier démarrage d'un agent rend `501` et
+      non `503` (`<if_fts/>`), et le décodeur `ossec` n'extrait aucun champ
+      nommé — voir `DISCOVERY.md`. Le noyau `bruit/` (`P02.2`) porte le
+      **compteur** que `<ignore>` ne sait pas porter ; son câblage est `P02.0`.
+- [x] **P01.19** (claude, 2026-09-10) **Les règles n'étaient posées sur aucune
+      machine.** `rules/` portait trente-huit règles (huit fichiers) écrites
+      par trois lots — et rien, dans aucun rôle, ne les copiait sur le serveur
+      central. Pire : le
+      `ossec.conf` rendu **n'avait pas de bloc `<ruleset>`**, et sans lui le
+      moteur charge son jeu de base en ignorant `etc/rules` (mesuré 4.14.7 : un
+      événement retombait sur la règle `504` au lieu de `100501`). Un serveur
+      installé ainsi tourne, journalise, et n'applique **aucune** détection du
+      dépôt — sans produire la moindre erreur. Livré :
+      `tasks/15_regles.yml` (pose préfixée `sentinel-`, retrait de ce que le
+      dépôt ne justifie plus, refus de continuer si le dépôt est vide) + le bloc
+      `<ruleset>` qui **étend** le jeu de l'éditeur au lieu de le remplacer +
+      la preuve par `wazuh-analysisd -t` après la pose.
+- [x] **P01.20** (claude, 2026-09-10) **Répétition à blanc du premier
+      déploiement** — conteneur Debian 12 `systemd`, `tailscale0` factice, `.env`
+      de test, inventaire de production joué en local. **Aucune machine du parc
+      touchée.** Le premier `--check --diff` échouait à **trois** endroits et le
+      premier `apply` à **deux** de plus ; les cinq sont corrigés et les trois
+      playbooks rendent maintenant leur verdict de bout en bout sur un hôte
+      vierge (`rc=0`). Détail dans `DISCOVERY.md` § répétition à blanc. Ce qui
+      en sort et qui n'était pas dans le code : `service_facts` ne liste pas les
+      `.timer` · `command` est sauté en `--check` · `systemctl show` rend
+      `MemoryMax=infinity` pour une unité qu'il ne connaît pas · **un
+      commentaire qui cite une balise que `wazuh-control` grep empêche l'unité
+      entière de démarrer**.
+      **Chaîne complète prouvée en bac à sable** : `00_check` → `--check` →
+      apply désarmé (unité `inactive`/`disabled`, huit fichiers de règles,
+      `analysisd -t` propre) → second passage (plafond mesuré) → armement
+      (`active`, **une seule socket**, `remoted` sur le tailnet). Reste non
+      prouvable ainsi : l'`apply` d'un agent avec enrôlement (deux machines),
+      et la durée réelle du premier démarrage.
+- [x] **P01.21** (claude, 2026-09-10) **Deux impossibilités du plan, trouvées en
+      le jouant.** (a) L'inventaire prévoyait un agent sur `patator-standby`
+      **et** le serveur central sur le même hôte — or `wazuh-agent` et
+      `wazuh-manager` se déclarent en **conflit de paquet** : `apt` refuse. Le
+      nœud qui héberge le moteur serait donc resté le seul nœud non surveillé du
+      parc, c'est-à-dire celui où vivent les preuves. Corrigé : `02_agent.yml`
+      vise `sentinel_agents_linux:!sentinel_server`, le rôle agent refuse de
+      s'exécuter sur l'hôte du manager, et le manager **se surveille lui-même**
+      (`syscheck` + journaux + `docker-listener` dans sa propre configuration,
+      à partir des **mêmes** variables `sentinel_fim_*` — une seule liste, deux
+      lecteurs).
+      (b) `wazuh-authd` écoute sur **`0.0.0.0`** et Wazuh n'offre aucune option
+      pour le lier à une interface : le port d'enrôlement et le secret qui le
+      protège étaient exposés au LAN, contre `C4` — et le contrôle d'écoute de
+      l'armement le refusait, à juste titre. L'enrôlement devient une
+      **fenêtre** (`sentinel_server_authd_ouvert`, `false` par défaut) que
+      l'exploitant ouvre puis referme ; les deux états sont signalés au bilan.
+      ⚠️ **Alternative écartée** : filtrer le port par `ufw` — `ufw` appartient à
+      HQ (contrat de frontière) et ne couvre pas les ports publiés par Docker.
 - [~] **P01.4** (claude, 2026-09-09) Rôle `sentinel_bornage` — les deux
       conditions vérifiables d'`ADR-003`, avec deux régimes **différents** :
       le **plafond** `cgroup` est une contrainte (posé sans garde, appliqué à

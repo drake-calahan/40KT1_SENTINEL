@@ -30,6 +30,16 @@ CPUQuota={{ sentinel_bornage_cpu_quota }}
 # problème et consomme la machine qu'il devait épargner.
 Restart=no
 
+# Le moteur démarre une douzaine de démons plus une API Python : mesuré entre
+# 25 s et plus de 90 s en répétition à blanc, selon la charge de la machine. Le
+# défaut systemd est 90 s, et au-delà le démarrage est TUÉ — sur un hôte qui
+# restaure le miroir Postgres chaque nuit, et avec l'IO en priorité `idle`
+# ci-dessous, ce plafond se touche. Un armement qui échoue au chronomètre se
+# relit comme une panne du moteur, et se rejoue au mauvais moment.
+# ⚠️ À CONFIRMER sur la machine : relever la durée réelle du premier démarrage
+# (`systemd-analyze blame` ou l'horodatage du journal) et ajuster si besoin.
+TimeoutStartSec=300
+
 # Priorité basse en écriture disque : la sauvegarde et la restauration du
 # miroir passent avant la collecte de journaux de sécurité.
 IOSchedulingClass=idle

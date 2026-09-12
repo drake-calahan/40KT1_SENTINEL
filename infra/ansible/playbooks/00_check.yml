@@ -88,6 +88,12 @@
     # qui ressemble à un problème de réseau ou de mot de passe et n'est ni l'un
     # ni l'autre. Le contournement (`ansible_become_exe: /usr/bin/sudo.ws`) est
     # dans l'inventaire ; cette tâche vérifie qu'il fonctionne encore.
+    # `check_mode: false` : sans lui, `command` est SAUTÉ en `--check` — et
+    # l'affirmation suivante lisait alors le résultat d'une tâche sautée, donc
+    # échouait en annonçant « l'élévation échoue (rc=?) ». Un playbook de
+    # contrôle qui ment sous le drapeau que le dépôt impose (`--check --diff`
+    # d'abord) est pire qu'absent. La commande ne modifie rien : `id -u` lit.
+    # Mesuré en répétition à blanc, 2026-09-10 (`P01.20`).
     - name: L'élévation de privilège fonctionne sur ce nœud
       ansible.builtin.command:
         cmd: /usr/bin/id -u
@@ -95,6 +101,7 @@
       register: verif_become
       changed_when: false
       failed_when: false
+      check_mode: false
 
     - name: État de l'élévation — ok / ko
       ansible.builtin.assert:
