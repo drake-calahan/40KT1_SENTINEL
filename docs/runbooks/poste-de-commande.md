@@ -42,6 +42,12 @@ cd ~/40KT1_SENTINEL/infra/ansible
 ansible-galaxy collection install -r requirements.yml
 ```
 
+⚠️ **Mesuré** : sans cette ligne, le premier playbook s'arrête sur « Invalid
+callback for stdout specified: yaml ». `ansible.cfg` demande un format de
+sortie fourni par `community.general` — le message parle de format, la cause
+est une collection absente. L'installation se joue **depuis `infra/ansible`**,
+où `collections_path` pointe.
+
 Contrôle :
 
 ```bash
@@ -118,9 +124,24 @@ message qui ressemble à un problème de réseau. Le contournement
 `patator-tower`. Le contrôle qui le vérifie est dans `00_check.yml`, et il rend
 son verdict même en `--check` depuis `P01.20`.
 
-Si l'élévation demande un mot de passe, ajouter `--ask-become-pass` aux
-commandes du runbook de mise en service. Ne **jamais** poser un mot de passe
-dans le dépôt, l'inventaire ou un `-e`.
+**Mesuré le 2026-09-14 :** les deux nœuds demandent un mot de passe sudo, et
+**ce n'est pas le même**. Or `-K` n'en demande qu'un et l'envoie à tous les
+hôtes : lancé sur les deux à la fois, le contrôle échoue en « Incorrect sudo
+password » partout. D'où la règle : **un nœud par commande**, avec `-K`, et
+`localhost` gardé dans le `--limit` (il porte la garde de cible et le bilan).
+
+```bash
+ansible-playbook -i inventory/production.yml playbooks/00_check.yml --check --diff -K --limit patator-tower,localhost
+```
+
+`00_check.yml` est le seul playbook qui vise les deux nœuds : `01_server.yml`
+ne vise que le standby, `02_agent.yml` que la tour. Ne **jamais** poser un mot
+de passe dans le dépôt, l'inventaire ou un `-e`.
+
+Deux autres faits relevés le même jour : la clé d'hôte SSH de `patator-tower`
+n'était pas connue de WSL — elle a été **comparée** à celle du `known_hosts`
+Windows (2026-08-28) avant d'être acceptée, pas acceptée à l'aveugle ; et le nom
+système de `patator-standby` est `virgil-patator`.
 
 ## 6. Le contrôle de terrain, qui clôt cette préparation
 
