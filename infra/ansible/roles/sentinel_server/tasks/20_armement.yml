@@ -56,6 +56,21 @@
     'stat' not in sentinel_server_bornage
     or not sentinel_server_bornage.stat.exists
 
+# ── Appliquer la configuration AVANT de la mesurer ────────────────────────
+# Les tâches de pose notifient « redemarrer le serveur central », et un handler
+# ne s'exécute qu'en FIN de play. Or la mesure d'écoute ci-dessous tombe AVANT
+# cette fin : sur un serveur déjà armé, elle mesurait donc le moteur encore
+# lancé avec l'ANCIENNE configuration. Mesuré le 2026-09-14 en refermant la
+# fenêtre d'enrôlement sur patator-standby : `ossec.conf` disait « authd
+# fermé », le moteur tournait toujours avec authd sur 0.0.0.0, le contrôle
+# a refusé à juste titre — et comme le play échouait, le redémarrage en
+# attente n'a JAMAIS eu lieu. La fenêtre restait ouverte, playbook rouge.
+#
+# `flush_handlers` joue le redémarrage en attente ICI, puis on démarre (sans
+# effet s'il vient d'avoir lieu) et on mesure ce que la configuration décrit.
+- name: Appliquer maintenant les redémarrages en attente
+  ansible.builtin.meta: flush_handlers
+
 - name: Activer et démarrer le serveur central
   ansible.builtin.systemd_service:
     name: "{{ sentinel_server_unite }}"

@@ -117,7 +117,13 @@
     - name: Rappeler ce que ce playbook n'a PAS fait
       ansible.builtin.debug:
         msg:
-          - "Le serveur central est POSÉ, pas armé — c'est l'état voulu."
+          # Ce message était écrit en dur et affirmait « POSÉ, pas armé » y
+          # compris après un armement réussi (mesuré 2026-09-14). Un bilan qui
+          # dit le contraire de l'état apprend à ne plus lire les bilans.
+          - >-
+            {{ "Le serveur central est ARMÉ par ce passage (-e sentinel_server_enabled=true) : écoute et collecte actives, AUCUNE réponse automatique."
+               if (sentinel_server_enabled | default(false) | bool)
+               else "Le serveur central est POSÉ, pas armé — c'est l'état voulu." }}
           - "Armement : geste d'exploitation, par runbook, par un humain (RULES § 1)."
           - "Avant d'armer : le bornage cgroup (P01.4) est un refus dur du rôle."
           - "Le tableau d'armement de .agent/ACTIVE.md reste la seule source de « ce qui tourne »."
