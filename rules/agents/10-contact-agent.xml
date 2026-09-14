@@ -15,13 +15,19 @@
   la paire se lit, et c'est même la preuve que la sonde regarde. La rafale, elle,
   est traitée ci-dessous.
 
-  ── Pourquoi le cas `patator-standby` a sa propre règle ────────────────────
-  Ce nœud a perdu son IPv4 QUATRE fois en trois semaines (28/08, 30/08, 05/09,
-  06/09), cause NetworkManager — DISCOVERY.md § patator-standby. Sans
-  agrégation, la première coupure produit une rafale d'alertes de perte de
+  ── Pourquoi l'agent de `patator-tower` a sa propre règle ──────────────────
+  `patator-standby` a perdu son IPv4 QUATRE fois en trois semaines (28/08,
+  30/08, 05/09, 06/09), cause NetworkManager — DISCOVERY.md § patator-standby.
+  Ce nœud porte le SERVEUR CENTRAL et, depuis P01.21, aucun agent (conflit de
+  paquet). Quand il perd le réseau, ce n'est donc pas « l'agent du standby »
+  qui décroche : c'est l'agent de la TOUR qui perd son manager. La première
+  version de cette règle visait `patator-standby` — un agent qui n'existe plus,
+  donc une règle qui ne se déclencherait jamais, et une rafale laissée intacte
+  sur la tour. Corrigé le 2026-09-14, avant la mise sous tension.
+
+  Sans agrégation, chaque coupure produit une rafale d'alertes de perte de
   contact, et la réaction naturelle est de couper le bruit : on perdrait alors
-  le signal, pas seulement le bruit. La règle s'écrit AVANT la mise sous
-  tension (runbook `mise-en-service.md` § 4), pas après le premier week-end.
+  le signal, pas seulement le bruit.
 
   ── Ce que `<ignore>` fait, et ce qu'il ne fait pas ────────────────────────
   `<ignore>900</ignore>` tient la fenêtre de 15 minutes de `F3` : une seule
@@ -44,16 +50,20 @@
   </rule>
 
   <!--
-    Attrape la même perte de contact quand elle vient de patator-standby, et
-    l'agrège sur 15 minutes. Le nom est ancré sur le séparateur `->` du message
-    du manager : `Agent disconnected: 'patator-standby->any'`. Un agent nommé
-    `patator-standby-2` ne serait donc PAS confondu avec celui-ci.
+    Attrape la même perte de contact quand elle vient de l'agent de
+    patator-tower, et l'agrège sur 15 minutes. Cause la plus probable : le
+    défaut IPv4 du standby, qui héberge le manager. Mais une panne de la tour
+    produit le même événement — l'agrégation ne supprime pas l'ouverture, elle
+    supprime les répétitions. Le nom est ancré sur le séparateur `->` du
+    message : `Agent disconnected: 'patator-tower->any'`. Le nom est celui
+    donné à l'enrôlement (`agent-auth -A inventory_hostname`), pas le nom
+    système de la machine.
   -->
   <rule id="100502" level="7">
     <if_sid>100501</if_sid>
-    <match>Agent disconnected: 'patator-standby-></match>
+    <match>Agent disconnected: 'patator-tower-></match>
     <ignore>900</ignore>
-    <description>Agent (orange) : perte de contact patator-standby — agrégée 15 min (défaut IPv4 connu)</description>
+    <description>Agent (orange) : perte de contact patator-tower — agrégée 15 min (défaut IPv4 du manager connu)</description>
   </rule>
 
   <!--

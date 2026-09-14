@@ -78,17 +78,49 @@
   # On ne la simule pas — on l'annonce non prise (voir le bilan).
   when: not ansible_check_mode
 
+# Deux corrections, mesurées en préparant l'enrôlement du MVP (2026-09-14) :
+#
+# 1. Le filtre ne regardait que les lignes contenant « wazuh ». L'API du moteur
+#    est un processus `python3` : si elle se liait un jour à 0.0.0.0, ce
+#    contrôle ne l'aurait pas vue. On sélectionne donc AUSSI par port — les
+#    trois ports que ce rôle ouvre.
+# 2. La fenêtre d'enrôlement (`sentinel_server_authd_ouvert`) fait écouter
+#    `wazuh-authd` sur 0.0.0.0, et Wazuh ne sait pas faire autrement. Le runbook
+#    demande d'ouvrir la fenêtre en armant : ce contrôle échouait donc
+#    SYSTÉMATIQUEMENT sur le geste documenté, service démarré et play rouge.
+#    Un contrôle qui échoue sur la procédure écrite apprend à ignorer le rouge.
+#    L'exception est NOMMÉE et bornée : authd, port d'enrôlement, drapeau
+#    explicite — et elle s'affiche en avertissement à chaque passage.
+- name: Relever les sockets du moteur qui écoutent hors du tailnet
+  ansible.builtin.set_fact:
+    sentinel_server_sockets_hors_tailnet: >-
+      {{ sentinel_server_sockets.stdout_lines
+         | select('search', 'wazuh|:(' ~ sentinel_server_port_evenements ~ '|'
+                  ~ sentinel_server_port_enrolement ~ '|' ~ sentinel_server_port_api ~ ')\s')
+         | reject('search', sentinel_server_listen_ip | regex_escape)
+         | list }}
+  when: not ansible_check_mode
+
+- name: Isoler l'exception de la fenêtre d'enrôlement, si elle est ouverte
+  ansible.builtin.set_fact:
+    sentinel_server_sockets_fenetre: >-
+      {{ (sentinel_server_sockets_hors_tailnet
+          | select('search', 'wazuh-authd')
+          | select('search', ':' ~ sentinel_server_port_enrolement ~ '\s')
+          | list)
+         if (sentinel_server_authd_ouvert | bool) else [] }}
+  when: not ansible_check_mode
+
 - name: Aucune socket du moteur n'écoute hors du tailnet
   ansible.builtin.assert:
     that:
-      - sentinel_server_sockets.stdout_lines
-        | select('search', 'wazuh')
-        | reject('search', sentinel_server_listen_ip | regex_escape)
-        | list | length == 0
+      - sentinel_server_sockets_hors_tailnet
+        | difference(sentinel_server_sockets_fenetre) | length == 0
     fail_msg: >-
       ÉCOUTE HORS TAILNET détectée. Une socket du moteur écoute sur autre chose
       que {{ sentinel_server_listen_ip }} ({{ sentinel_server_listen_interface }}) :
-      {{ sentinel_server_sockets.stdout_lines | select('search', 'wazuh') | reject('search', sentinel_server_listen_ip | regex_escape) | join(' | ') }}
+      {{ sentinel_server_sockets_hors_tailnet
+         | difference(sentinel_server_sockets_fenetre) | join(' | ') }}
       C4 est formel — tailnet UNIQUEMENT, jamais Funnel, jamais cloudflared,
       jamais le nom public. `ufw` ne rattrape pas cela de façon fiable : il ne
       couvre pas les ports publiés par Docker (.agent/DISCOVERY.md). Désarmer,
@@ -96,8 +128,24 @@
     success_msg: >-
       écoute : {{ sentinel_server_listen_ip }} seulement — condition 3
       d'ADR-003 vérifiée, pas seulement déclarée
+      {{- " (hors fenêtre d'enrôlement, signalée ci-dessous)"
+          if sentinel_server_sockets_fenetre | length > 0 else '' }}
     quiet: true
   when: not ansible_check_mode
+
+- name: AVERTIR — la fenêtre d'enrôlement expose authd au LAN
+  ansible.builtin.debug:
+    msg:
+      - "⚠️ FENÊTRE D'ENRÔLEMENT OUVERTE — exception tolérée, pas un état nominal."
+      - "{{ sentinel_server_sockets_fenetre | join(' | ') }}"
+      - >-
+        wazuh-authd écoute hors tailnet (Wazuh ne sait pas le lier à une
+        interface). Inscrire les agents, PUIS refermer en rejouant ce playbook
+        SANS sentinel_server_authd_ouvert. Tant que cette ligne s'affiche, C4
+        n'est pas tenu sur le port {{ sentinel_server_port_enrolement }}.
+  when:
+    - not ansible_check_mode
+    - sentinel_server_sockets_fenetre | default([]) | length > 0
 
 - name: Consigner que le serveur central a été armé
   ansible.builtin.debug:

@@ -81,6 +81,13 @@ Deux valeurs différentes ne produisent pas une erreur claire — elles produise
 un agent qui ne s'enrôle pas, sur un serveur qui refuse sans dire pourquoi. On
 la génère **une fois**, et on la recopie.
 
+**Le plus simple : le script** [`infra/ops/poser-env.sh`](../../infra/ops/poser-env.sh),
+joué depuis WSL. Il génère la clé en mémoire **sans jamais l'afficher**, la
+pose identique sur les deux nœuds (`0600 root:root`), refuse d'écraser un
+`.env` existant, et sudo demande le mot de passe de chaque nœud à son tour.
+
+La marche à la main, pour comprendre ce qu'il fait ou s'en passer :
+
 **1. Générer la clé** — sur le poste de commande, une seule fois :
 
 ```bash
@@ -221,7 +228,10 @@ ansible-playbook -i inventory/production.yml playbooks/01_server.yml   -e '{"sen
 
 … puis on inscrit les agents (§ 3), **puis on referme** en rejouant la même
 commande **sans** `sentinel_server_authd_ouvert`. Tant que la fenêtre est
-ouverte, le playbook le signale à chaque passage, et l'armement le refuse.
+ouverte, le contrôle d'écoute **tolère** la seule socket `wazuh-authd` sur le
+port d'enrôlement — exception nommée, bornée au drapeau — et l'affiche en
+avertissement « FENÊTRE D'ENRÔLEMENT OUVERTE » à chaque passage. Toute autre
+socket hors tailnet reste un refus.
 
 ## 3. Les agents, un nœud à la fois
 
